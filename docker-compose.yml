@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  # Define the Next.js app service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile  # Build using the Dockerfile
+    ports:
+      - "3000:3000"  # Map container's port 3000 to local machine's port 3000
+    environment:
+      DATABASE_URL: postgresql://postgres:pass@db:5432/clash?schema=public  # Database connection string for Prisma
+    depends_on:
+      - db  # Wait for the db service to be ready before starting the app
+    networks:
+      - clash-network
+
+  # Define the PostgreSQL database service
+  db:
+    image: postgres:15.3  # Use the official PostgreSQL Docker image
+    environment:
+      POSTGRES_PASSWORD: pass  # Database password
+      POSTGRES_USER: postgres  # Default PostgreSQL user
+      POSTGRES_DB: clash  # Name of the database Prisma will use
+    ports:
+      - "5432:5432"  # Expose port 5432 for PostgreSQL
+    networks:
+      - clash-network
+
+# Define the network that the services will share
+networks:
+  clash-network:
+    driver: bridge
