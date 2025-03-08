@@ -16,10 +16,13 @@ model User {
 }
 
 model Product {
-  id          Int     @id @default(autoincrement())
+  id          String  @id @default(uuid()) // ✅ UUID for your own products
+  stripeId    String? @unique // ✅ Optional Stripe ID for Stripe products
   name        String
   description String
   price       Float
-  imageUrl    String  // URL of the product image
+  imageUrl    String
   createdAt   DateTime @default(now())
 }
+
+
