@@ -1,78 +1,73 @@
-import { NextApiRequest, NextApiResponse } from "next";
-import Stripe from "stripe";
+import Stripe from 'stripe';
+import { NextApiRequest, NextApiResponse } from 'next';
+import prisma from '@/lib/prisma';
 
-// Define the products list as it was in the `page.tsx` file
-const products = {
-  Coffee: [
-    { name: 'Espresso', price: 3.5, imageUrl: 'https://example.com/espresso.jpg' },
-    { name: 'Latte', price: 4.0, imageUrl: 'https://example.com/latte.jpg' },
-    { name: 'Cappuccino', price: 4.5, imageUrl: 'https://example.com/cappuccino.jpg' }
-  ],
-  'Milk Tea': [
-    { name: 'Bubble Tea', price: 5.0, imageUrl: 'https://example.com/bubble-tea.jpg' },
-    { name: 'Green Tea', price: 4.0, imageUrl: 'https://example.com/green-tea.jpg' }
-  ],
-  Clashades: [
-    { name: 'Sunglasses A', price: 20.0, imageUrl: 'https://example.com/sunglasses-a.jpg' },
-    { name: 'Sunglasses B', price: 25.0, imageUrl: 'https://example.com/sunglasses-b.jpg' }
-  ],
-  'Clash Lightning': [
-    { name: 'Lightning Bolt Drink', price: 6.5, imageUrl: 'https://example.com/lightning-bolt.jpg' },
-    { name: 'Electro Drink', price: 7.0, imageUrl: 'https://example.com/electro-drink.jpg' }
-  ],
-};
-
-// Initialize Stripe with your secret key
-const stripe = new Stripe(process.env.STRIPE_PUBLISHABLE_KEY as string);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method === "POST") {
-    const { cart } = req.body;
-    console.log(cart)
+  // Ensure this endpoint only accepts POST requests
+  if (req.method !== 'POST') {
+    return res.status(405).json({ message: 'Method Not Allowed' });
+  }
 
-    // Validate the cart and map items to the Stripe API format
-    const items = Object.keys(cart).map((item) => {
-      const product = Object.values(products).flat().find((p) => p.name === item);
-      
-      // Ensure the product exists in the products list
-      if (!product) {
-        return null;  // Return null if the product is not found
+  try {
+    console.log('Incoming request body:', req.body); // Log the incoming request body
+
+    const { cart } = req.body;  // Destructure 'cart' from the request body (ensure frontend sends it as 'cart')
+    const cartItemsArray = Object.values(cart);
+    // Validate that 'cart' is an array and not empty
+    if (!cartItemsArray || cartItemsArray.length === 0) {
+      throw new Error('Invalid or empty cart items array');
+    }
+
+    // Construct Stripe line items from the cart items
+    const dbProducts = await prisma.product.findMany({where: {id: {
+      in: Object.keys(cart)
+    }}})
+
+    const dbProductsByStripeId = Object.fromEntries(dbProducts.map(p => [p.stripeId, p]))
+
+    const lineItems = Object.values(cart).map((item: any) => {
+      if (!item.quantity || !item.stripeId ) {
+        throw new Error('Missing item properties: quantity, stripeId');
       }
+
+      const dbProduct = dbProductsByStripeId[item.stripeId]
+
+      // Ensure price is in cents (Stripe expects unit_amount in cents)
+      const unitAmount = Math.round(dbProduct.price * 100); // Convert price to cents
 
       return {
         price_data: {
-          currency: "usd",
+          currency: 'usd',
           product_data: {
-            name: item,
-            images: [product.imageUrl],
+            name: dbProduct.name,
+            description: dbProduct.description || 'No description provided', // Default description if none exists
+            images: [dbProduct.imageUrl], // Include the image URL
           },
-          unit_amount: Math.round(product.price * 100),  // Convert to cents
+          unit_amount: unitAmount, // Convert to cents
         },
-        quantity: cart[item],
+        quantity: item.quantity,
       };
-    }).filter(item => item !== null);  // Remove invalid/null items from the array
+    });
 
-    // Ensure there are items to send to Stripe
-    if (items.length === 0) {
-      return res.status(400).json({ error: "No valid products in cart" });
-    }
+    console.log('Stripe line items:', lineItems); // Log the formatted Stripe line items
 
-    try {
-      // Create Stripe session with success and cancel URLs based on localhost
-      const session = await stripe.checkout.sessions.create({
-        payment_method_types: ["card"],
-        line_items: items as Stripe.Checkout.SessionCreateParams.LineItem[], // Cast to proper Stripe LineItem type
-        mode: "payment",
-        success_url: `${process.env.NEXT_PUBLIC_SITE_URL}/Success`,
-        cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL}/Cancel`,
-      });
+    // Create the Stripe session
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'], // Only accept card payments
+      line_items: lineItems,
+      mode: 'payment',  // One-time payment mode
+      success_url: `${process.env.NEXT_PUBLIC_DOMAIN}/success?session_id={CHECKOUT_SESSION_ID}`, // Redirect on success
+      cancel_url: `${process.env.NEXT_PUBLIC_DOMAIN}/cancel`, // Redirect on cancel
+    });
 
-      res.status(200).json({ id: session.id });
-    } catch (error) {
-      console.error("Error creating session:", error);
-      res.status(500).json({ error: "Internal Server Error" });
-    }
-  } else {
-    res.status(405).json({ error: "Method Not Allowed" });
+    console.log('Stripe session created:', session); // Log session creation response
+
+    // Send the session ID back to the frontend
+    return res.status(200).json({ id: session.id });
+  } catch (error) {
+    console.error('Error creating Stripe session:', error); // Log any errors
+    return res.status(500).json({ error: (error as Error).message });
   }
 }

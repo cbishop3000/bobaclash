@@ -1,12 +1,7 @@
 import React from "react";
 
-const Success = () => {
-  return (
-    <div>
-      <h1>Payment Successful!</h1>
-      <p>Thank you for your purchase. Your payment was successful.</p>
-    </div>
-  );
+const SuccessPage = () => {
+  return <h1>Payment Successful!</h1>;
 };
 
-export default Success;
+export default SuccessPage;

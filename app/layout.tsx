@@ -2,6 +2,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from './components/navbar';  // Correct import for Navbar
+import { CartProvider } from "@/app/context/CartContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,14 +25,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {/* Navbar will be shown on every page */}
-        <Navbar />
-        <main>{children}</main>  {/* Ensure children (page content) is rendered here */}
-      </body>
-    </html>
+    <CartProvider>
+      <div>
+        <html lang="en">
+        <body
+          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        >
+          {/* Navbar will be shown on every page */}
+          <Navbar />
+          <main>{children}</main>  {/* Ensure children (page content) is rendered here */}
+        </body>
+      </html>
+      </div>
+    </CartProvider>
   );
 }

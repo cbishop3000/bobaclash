@@ -1,12 +1,7 @@
 import React from "react";
 
-const Cancel = () => {
-  return (
-    <div>
-      <h1>Payment Canceled</h1>
-      <p>Your payment was canceled. Please try again later.</p>
-    </div>
-  );
+const CancelPage = () => {
+  return <h1>Payment Canceled!</h1>;
 };
 
-export default Cancel;
+export default CancelPage;
