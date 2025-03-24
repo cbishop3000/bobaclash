@@ -26,8 +26,8 @@ const CheckoutButton = () => {
     return product
       ? {
           name: product.name,
-          quantity: item.quantity, // Use the quantity from cart
-          price: item.price, // Use price from the cart
+          quantity: product.quantity, // Use the quantity from cart
+          price: product.price, // Use price from the cart
           description: product.description,
           imageUrl: product.imageUrl,
         }

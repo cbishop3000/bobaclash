@@ -3,38 +3,48 @@ import stripe from '../../lib/stripe'; // Import the initialized Stripe client
 
 const syncStripeProducts = async () => {
   try {
-    console.log('Fetching products from Stripe...');
+    console.log('🔄 Fetching products from Stripe...');
 
-    // Fetch products from Stripe (limit to 100 for now)
+    // Fetch products from Stripe (limit to 100)
     const stripeProducts = await stripe.products.list({ limit: 100 });
 
-    // Log the data to see if products are fetched correctly
-    console.log('Fetched products from Stripe:', stripeProducts.data);
+    if (!stripeProducts.data.length) {
+      console.log('⚠️ No products found in Stripe.');
+      return;
+    }
 
-    // Loop through the fetched products and upsert them in the Prisma database
     for (const product of stripeProducts.data) {
-      console.log(`Syncing Product ID: ${product.id}`);
+      console.log(`🔄 Syncing Product ID: ${product.id}`);
 
-      // Upsert the product in Prisma (update or create)
+      // Fetch associated prices for this product
+      const prices = await stripe.prices.list({ product: product.id });
+
+      // Get the first valid price (Stripe can have multiple prices per product)
+      const price = prices.data?.[0]?.unit_amount ? prices.data[0].unit_amount / 100 : 0;
+
+      console.log(price)
+      // Upsert the product in Prisma
       await prisma.product.upsert({
-        where: { stripeId: product.id }, // Use Stripe ID to match the product
+        where: { stripeId: product.id }, // Use Stripe ID as the unique key
         update: {
           name: product.name,
           description: product.description || '',
-          imageUrl: product.images.length > 0 ? product.images[0] : '', // Handle images array
+          price: price, // Store the correct price from Stripe
+          imageUrl: product.images.length > 0 ? product.images[0] : '',
         },
         create: {
-          stripeId: product.id, // Store Stripe Product ID
+          stripeId: product.id,
           name: product.name,
           description: product.description || '',
-          price: 0, // Prices are handled separately
-          imageUrl: product.images.length > 0 ? product.images[0] : '', // Handle images array
+          price: price, // Store the correct price from Stripe
+          imageUrl: product.images.length > 0 ? product.images[0] : '',
         },
       });
-      console.log(`Product with ID: ${product.id} synced successfully!`);
+
+      console.log(`✅ Product synced: ${product.name} ($${price})`);
     }
 
-    console.log('✅ Successfully synced products to Prisma!');
+    console.log('🎉 Successfully synced all products to Prisma!');
   } catch (error) {
     console.error('❌ Error syncing products:', error);
   }

@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import { useCart } from "../context/CartContext"; // Ensure the import path is correct
-import CheckoutButton from "../components/CheckoutButton";
 
 type Cart = Record<string, CartItem>;
 
@@ -202,20 +201,27 @@ const Shop = () => {
             <div>Your cart is empty</div>
           ) : (
             Object.entries(cart).map(([itemName, cartItem]) => {
-              const item = cartItem as CartItem; // Explicitly typing the cartItem as CartItem
-              const product = products.find((p) => p.id === p.id);
+              const item = cartItem as CartItem; // Explicitly typing cartItem as CartItem
+              const product = products.find((p) => p.id === item.id); // Match correct product
+
               return (
                 <div key={itemName} className="flex items-center space-x-4 mb-4 p-2 bg-gray-700 rounded-lg">
-                  <img src={product?.imageUrl} alt={product?.name} className="w-16 h-16 object-cover rounded-md" />
-                  <div className="flex-grow">
-                    <div className="font-semibold">{product?.name}</div>
-                    <div>Quantity: {item.quantity}</div>
-                  </div>
-                </div>
+                  {product && (
+                    <>
+                      <img src={product.imageUrl} alt={product.name} className="w-16 h-16 object-cover rounded-md" />
+                      <div className="flex-grow">
+                        <div className="font-semibold">{product.name}</div>
+                        <div>Quantity: {item.quantity}</div>
+                        <div>Total Price: ${item.price * item.quantity}</div>
+                      </div>
+                    </>
+                  )}
+                </div> 
               );
             })
           )}
         </div>
+
       </div>
     </div>
   );

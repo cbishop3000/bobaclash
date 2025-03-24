@@ -8,21 +8,49 @@ datasource db {
 }
 
 model User {
-  id       String  @id @default(uuid())
-  username String
-  email    String  @unique
-  password String
-  createdAt DateTime @default(now())
+  id                      String   @id @default(uuid())
+  username                String
+  email                   String   @unique
+  password                String
+  createdAt               DateTime @default(now())
+
+  // Stripe Integration
+  stripeCustomerId        String?  @unique
+  stripeSubscriptionId    String?  @unique
+  stripeSubscriptionStatus String? 
+  subscriptionTier        String?  // 'BASIC', 'PRO', etc.
+  
+  // Relationships
+  orders                  Order[]
+  subscriptions            Subscription[]
+}
+
+model Order {
+  id          String   @id @default(uuid())
+  userId      String?  // Optional (null for guest purchases)
+  user        User?    @relation(fields: [userId], references: [id])
+  stripePaymentIntentId String @unique
+  totalAmount Float
+  status      String   @default("pending") // 'pending', 'paid', 'failed'
+  createdAt   DateTime @default(now())
+}
+
+model Subscription {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+  stripeSubscriptionId String @unique
+  status      String   // 'active', 'canceled', 'past_due'
+  tier        String   // 'BASIC', 'PRO'
+  createdAt   DateTime @default(now())
 }
 
 model Product {
-  id          String  @id @default(uuid()) // ✅ UUID for your own products
-  stripeId    String? @unique // ✅ Optional Stripe ID for Stripe products
+  id          String   @id @default(uuid())
   name        String
   description String
   price       Float
   imageUrl    String
   createdAt   DateTime @default(now())
+  stripeId    String?  @unique
 }
-
-
