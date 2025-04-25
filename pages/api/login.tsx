@@ -36,13 +36,13 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
         return res.status(401).json({ error: 'Invalid email or password' });
       }
 
-      // Create a JWT token (You can set it in the cookie or return it)
+      // Create a JWT token
       const token = generateToken(user.id);
 
-      // Set the token as a HttpOnly cookie
-      res.setHeader('Set-Cookie', `authToken=${token}; HttpOnly; Path=/; Max-Age=3600; SameSite=Strict`);
+      // Set the token as a HttpOnly cookie with secure flags
+      res.setHeader('Set-Cookie', `authToken=${token}; HttpOnly; Path=/; Max-Age=3600; SameSite=Strict; Secure`);
 
-      // Respond with a success message and a token
+      // Respond with a success message
       return res.status(200).json({ message: 'Login successful' });
     } catch (error) {
       console.error(error);

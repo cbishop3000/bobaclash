@@ -1,177 +1,164 @@
-import React, { useState } from 'react';
+"use client"
+import { useState } from "react";
+import { useModal } from "../app/context/ModalContext";
 
 const AuthModal = () => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isSignup, setIsSignup] = useState(true); // State to toggle between Sign Up and Login
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);  // To handle loading state
-  const [errorMessage, setErrorMessage] = useState(''); // To display error messages
+  const { isOpen, closeModal } = useModal();
 
-  // Toggle between Sign Up and Login modals
-  const toggleModal = () => {
-    setIsModalOpen(!isModalOpen);
-    setErrorMessage(''); // Reset error message when toggling the modal
+  const [isLogin, setIsLogin] = useState(true); // This is where we declare setIsLogin
+  const [form, setForm] = useState({
+    email: "",
+    password: "",
+    name: "",
+    confirmPassword: ""
+  });
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const handleChange = (e: React.ChangeEvent<any>) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleLogin = async () => {
+    setLoading(true);
+    setErrorMessage("");
+
+    const { email, password } = form;
+
+    try {
+      const response = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        localStorage.setItem("token", data.token);
+        alert("Login successful!");
+        closeModal();
+      } else {
+        setErrorMessage(data.error || "Something went wrong");
+      }
+    } catch {
+      setErrorMessage("Internal server error");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSignup = async () => {
+    setLoading(true);
+    setErrorMessage("");
+
+    const { name, email, password, confirmPassword } = form;
+
     if (password !== confirmPassword) {
       setErrorMessage("Passwords do not match!");
+      setLoading(false);
       return;
     }
 
-    setLoading(true);  // Start loading
-
     try {
-      const response = await fetch('/api/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      const response = await fetch("/api/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: name, email, password }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        alert('Sign Up successful!');
-        setIsModalOpen(false);  // Close the modal on success
+        alert("Sign Up successful!");
+        closeModal();
       } else {
-        setErrorMessage(data.error || 'Something went wrong');
+        setErrorMessage(data.error || "Something went wrong");
       }
-    } catch (error) {
-      setErrorMessage('Internal server error');
+    } catch {
+      setErrorMessage("Internal server error");
     } finally {
-      setLoading(false);  // Stop loading
+      setLoading(false);
     }
   };
 
-  const handleLogin = async () => {
-    setLoading(true); // Set loading state
-    setErrorMessage(''); // Reset any previous errors
-  
-    try {
-      const response = await fetch('/api/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-  
-      const data = await response.json();
-  
-      if (response.ok) {
-        // Store the token (e.g., in localStorage or cookies)
-        localStorage.setItem('token', data.token);
-  
-        alert('Login successful');
-        setIsModalOpen(false); // Close modal on success
-      } else {
-        setErrorMessage(data.error || 'Something went wrong');
-      }
-    } catch (error) {
-      setErrorMessage('Internal server error');
-    } finally {
-      setLoading(false); // Reset loading state
-    }
-  };
-  
+  if (!isOpen) return null;
 
   return (
-    <>
-      {/* Separate Buttons for Sign Up and Login */}
-      <button className="bg-amber-200 m-2 rounded p-4" onClick={() => { setIsSignup(true); toggleModal(); }}>
-        Sign Up
-      </button>
-      <button className="bg-amber-200 m-2 rounded p-4" onClick={() => { setIsSignup(false); toggleModal(); }}>
-        Login
-      </button>
+    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+      <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full">
+        <h2 className="text-xl font-semibold mb-4">{isLogin ? "Login" : "Sign Up"}</h2>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full">
-            <h2 className="text-xl font-semibold mb-4">{isSignup ? 'Sign Up' : 'Login'}</h2>
+        {errorMessage && <p className="text-red-500 text-sm mb-4">{errorMessage}</p>}
 
-            {errorMessage && <p className="text-red-500 text-sm mb-4">{errorMessage}</p>}
+        {!isLogin && (
+          <input
+            type="text"
+            name="name"
+            placeholder="Name"
+            value={form.name}
+            onChange={handleChange}
+            className="w-full mb-2 p-2 border border-gray-300 rounded"
+          />
+        )}
 
-            {isSignup ? (
-              <>
-                {/* Sign Up Form */}
-                <input
-                  type="text"
-                  placeholder="Name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full mb-2 p-2 border border-gray-300 rounded"
-                />
-                <input
-                  type="email"
-                  placeholder="Email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full mb-2 p-2 border border-gray-300 rounded"
-                />
-                <input
-                  type="password"
-                  placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full mb-2 p-2 border border-gray-300 rounded"
-                />
-                <input
-                  type="password"
-                  placeholder="Confirm Password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full mb-4 p-2 border border-gray-300 rounded"
-                />
-                <button
-                  onClick={handleSignup}
-                  className="w-full bg-amber-900 text-white py-2 rounded hover:bg-amber-100"
-                  disabled={loading}
-                >
-                  {loading ? 'Signing Up...' : 'Sign Up'}
-                </button>
-              </>
-            ) : (
-              <>
-                {/* Login Form */}
-                <input
-                  type="email"
-                  placeholder="Email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full mb-2 p-2 border border-gray-300 rounded"
-                />
-                <input
-                  type="password"
-                  placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full mb-4 p-2 border border-gray-300 rounded"
-                />
-                <button
-                  onClick={handleLogin}
-                  className="w-full bg-amber-900 text-white py-2 rounded hover:bg-amber-100"
-                >
-                  Login
-                </button>
-              </>
-            )}
+        <input
+          type="email"
+          name="email"
+          placeholder="Email"
+          value={form.email}
+          onChange={handleChange}
+          className="w-full mb-2 p-2 border border-gray-300 rounded"
+        />
 
+        <input
+          type="password"
+          name="password"
+          placeholder="Password"
+          value={form.password}
+          onChange={handleChange}
+          className="w-full mb-2 p-2 border border-gray-300 rounded"
+        />
+
+        {!isLogin && (
+          <input
+            type="password"
+            name="confirmPassword"
+            placeholder="Confirm Password"
+            value={form.confirmPassword}
+            onChange={handleChange}
+            className="w-full mb-4 p-2 border border-gray-300 rounded"
+          />
+        )}
+
+        <button
+          onClick={isLogin ? handleLogin : handleSignup}
+          className="w-full bg-amber-900 text-white py-2 rounded hover:bg-amber-100 mt-2"
+          disabled={loading}
+        >
+          {loading ? (isLogin ? "Logging In..." : "Signing Up...") : isLogin ? "Login" : "Sign Up"}
+        </button>
+
+        <button
+          onClick={closeModal}
+          className="w-full mt-2 text-gray-500 text-sm"
+        >
+          Close
+        </button>
+
+        <div className="mt-2 text-center text-sm">
+          <span>
+            {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
             <button
-              onClick={toggleModal}
-              className="w-full mt-2 text-gray-500 text-sm"
+              onClick={() => setIsLogin(!isLogin)} // Now this works because setIsLogin is defined!
+              className="text-blue-500 underline"
             >
-              Close
+              {isLogin ? "Sign up" : "Log in"}
             </button>
-          </div>
+          </span>
         </div>
-      )}
-    </>
+      </div>
+    </div>
   );
 };
 

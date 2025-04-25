@@ -1,60 +1,72 @@
-// pages/api/subscribe.ts
 import { NextApiRequest, NextApiResponse } from 'next';
-import prisma from '../../lib/prisma';
+import bcrypt from 'bcryptjs';
 import Stripe from 'stripe';
+import prisma from '../../lib/prisma';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
+
+// Utility function to map priceId → subscriptionTier
+const getTierFromPriceId = (priceId: string): 'LIKE' | 'LOVE' | 'NEED' | 'CLASHOHOLIC' => {
+  const mapping: { [key: string]: 'LIKE' | 'LOVE' | 'NEED' | 'CLASHOHOLIC' } = {
+    'price_like': 'LIKE',
+    'price_love': 'LOVE',
+    'price_need': 'NEED',
+    'price_clashoholic': 'CLASHOHOLIC',
+  };
+
+  return mapping[priceId] ?? 'LIKE'; // default fallback
+};
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const { email, priceId } = req.body; // We only need email and priceId here (no username, password)
+  const { email, priceId } = req.body;
 
-  // Make sure all required fields are provided
   if (!email || !priceId) {
     return res.status(400).json({ error: 'Email and priceId are required' });
   }
 
   try {
-    // Check if the user already exists in the database by their email
-    let user = await prisma.user.findUnique({
-      where: { email },
-    });
+    // Check if the user already exists
+    let user = await prisma.user.findUnique({ where: { email } });
 
-    // If the user doesn't exist, create them automatically (set a default password or similar)
+    // Create user if they don’t exist
     if (!user) {
-      // This is where you can set a default password for new users, you can handle it as you like
+      const hashedPassword = await bcrypt.hash('default_password', 10); // you could also generate a random one
+
       user = await prisma.user.create({
         data: {
-          email, // Required
-          username: email.split('@')[0],  // Use email prefix as a default username
-          password: 'default_password',  // A default password (you should hash it for production)
+          email,
+          password: hashedPassword,
+          stripeCustomerId: '', // we’ll update after Stripe customer is created
+          subscriptionTier: getTierFromPriceId(priceId),
         },
       });
     }
 
-    // Now, handle Stripe subscription
+    // If the user doesn't yet have a Stripe customer ID
     let stripeCustomerId = user.stripeCustomerId;
+
     if (!stripeCustomerId) {
       const customer = await stripe.customers.create({
         email: user.email,
         metadata: { userId: user.id },
       });
 
-      // Update user with Stripe Customer ID
       stripeCustomerId = customer.id;
+
       await prisma.user.update({
         where: { id: user.id },
         data: { stripeCustomerId },
       });
     }
 
-    // Create Stripe Checkout session
+    // Create checkout session
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
       mode: 'subscription',
+      payment_method_types: ['card'],
       customer: stripeCustomerId,
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
@@ -62,8 +74,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     return res.status(200).json({ sessionId: session.id });
-  } catch (error) {
-    console.error('Subscription error:', error);
+  } catch (err) {
+    console.error('Subscription error:', err);
     return res.status(500).json({ error: 'Internal Server Error' });
   }
 }

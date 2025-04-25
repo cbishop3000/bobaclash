@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';  // For hashing the password
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'POST') {
-    const { username, email, password } = req.body;
+    const { email, password } = req.body;
 
     try {
       // Hash the password before storing it
@@ -14,7 +14,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Create the user in the database using Prisma
       const newUser = await prisma.user.create({
         data: {
-          username,
           email,
           password: hashedPassword,  // Store the hashed password
         },

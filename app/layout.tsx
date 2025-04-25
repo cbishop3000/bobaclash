@@ -1,8 +1,11 @@
 // app/layout.tsx
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Navbar from './components/navbar';  // Correct import for Navbar
-import { CartProvider } from "@/app/context/CartContext";
+import Navbar from "./components/navbar";
+
+import { ModalProvider } from "./context/ModalContext"; 
+import { AuthProvider } from "./context/AuthContext";   
+import AuthModal from "@/pages/AuthModal";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -25,18 +28,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <CartProvider>
-      <div>
-        <html lang="en">
-        <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        >
-          {/* Navbar will be shown on every page */}
-          <Navbar />
-          <main>{children}</main>  {/* Ensure children (page content) is rendered here */}
-        </body>
-      </html>
-      </div>
-    </CartProvider>
+    <html lang="en">
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}>
+        <AuthProvider> {/* 🛡️ Wrap the whole app in AuthProvider FIRST */}
+          <ModalProvider> {/* ModalProvider goes INSIDE AuthProvider */}
+            <Navbar />
+            <main className="flex-grow">{children}</main>
+            <AuthModal />
+          </ModalProvider>
+        </AuthProvider>
+      </body>
+    </html>
   );
 }
