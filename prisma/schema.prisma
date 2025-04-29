@@ -11,6 +11,7 @@ model User {
   id               String   @id @default(cuid())
   email            String   @unique
   password         String   // hashed!
+  role             UserRole    @default(USER) 
   stripeCustomerId String?  // ✅ make optional
   subscriptionTier SubscriptionTier? // ✅ make optional
   isNewSubscriber  Boolean  @default(true)
@@ -18,6 +19,11 @@ model User {
   deliveries       DeliveryLog[]
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+}
+
+enum UserRole {
+  USER
+  ADMIN
 }
 
 model DeliveryLog {
@@ -46,6 +52,7 @@ model Plan {
   features        String[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  address         String?
 }
 
 

@@ -1,20 +1,21 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { loadStripe } from '@stripe/stripe-js';
+import { useAuth } from "@/app/context/AuthContext";
 
 interface SubscriptionInfo {
   title: string;
   description: string;
-  priceCents: number; // price stored in cents
+  priceCents: number;
   features: string[];
-  stripePriceId: string; // ID used for Stripe checkout
+  stripePriceId: string;
 }
 
 export default function Subscribe() {
-  const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
+  const { isLoggedIn, user } = useAuth();
   const [priceId, setPriceId] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Hardcoded subscription data (just for illustration, should be from DB)
   const subscriptionInfo: SubscriptionInfo[] = [
     {
       title: "Clashaholic",
@@ -63,42 +64,54 @@ export default function Subscribe() {
     }
   ];
 
-  const checkLoggedIn = () => {
-    // You would replace this with a real login check, such as checking localStorage or a token
-    const isLoggedIn = localStorage.getItem('userLoggedIn') === 'true';
-    setIsUserLoggedIn(isLoggedIn);
-  };
-
-  useEffect(() => {
-    // Run the checkLoggedIn function when the component mounts
-    checkLoggedIn();
-  }, []);
-
-  // Handle the subscription logic, triggered when the user is logged in
   const handleSubscription = async () => {
-    if (isUserLoggedIn && priceId) {
+    if (isLoggedIn && priceId) {
       console.log('Processing subscription for priceId:', priceId);
-      // Call Stripe or backend to create a subscription session
-      // Example: redirect to Stripe checkout or API call
+
+      const response = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ priceId }),
+      });
+
+      if (!response.ok) {
+        console.error('Failed to create checkout session');
+        return;
+      }
+
+      const session = await response.json();
+
+      const stripeInstance = await loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
+
+      if (!stripeInstance) {
+        console.error('Stripe failed to load');
+        return;
+      }
+
+      const { error } = await stripeInstance.redirectToCheckout({ sessionId: session.id });
+
+      if (error) {
+        console.error('Error redirecting to checkout:', error.message);
+      }
     }
   };
 
-  // Handle login and redirection to signup page
   const handleLoginAndSubscribe = () => {
     console.log('Redirecting to login or account creation...');
-    // Implement your redirect to login or signup flow
+    window.location.href = '/login';
   };
 
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-4xl font-bold mb-6 text-center">Coffee Subscription</h1>
 
-      {/* Main Content - Grid of subscription options */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {subscriptionInfo.map((info, index) => (
           <div key={index} className="bg-white shadow-lg rounded-lg p-6">
             <h2 className="text-2xl font-semibold mb-2">{info.title}</h2>
-            <p className="text-gray-700 mb-4">{info.description}</p>
+            <p className="text-gray-700 mb-4 whitespace-pre-line">{info.description}</p>
             <p className="text-xl font-bold mb-4">{`$${(info.priceCents / 100).toFixed(2)} / month`}</p>
             <h3 className="font-medium mb-2">Features:</h3>
             <ul className="list-disc pl-6 space-y-2 text-gray-700">
@@ -107,47 +120,29 @@ export default function Subscribe() {
               ))}
             </ul>
 
-            {/* Button */}
             <button
               onClick={() => {
-                // Check if the user is logged in
-                if (!isUserLoggedIn) {
-                  // If not logged in, prompt to login or sign up
+                if (!isLoggedIn) {
                   handleLoginAndSubscribe();
                 } else {
-                  // If logged in, set the price ID and open the modal
-                  setPriceId(info.stripePriceId); // Set the selected subscription's Stripe price ID
-                  setIsModalOpen(true); // Open modal when user selects a plan
+                  setPriceId(info.stripePriceId);
+                  setIsModalOpen(true);
                 }
               }}
-              className={`mt-4 py-2 px-4 rounded-full ${
-                isUserLoggedIn ? 'bg-blue-500 text-white' : 'bg-gray-400 text-gray-200 cursor-not-allowed'
+              className={`mt-4 py-2 px-4 rounded-full w-full ${
+                isLoggedIn ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-400 text-white cursor-not-allowed'
               }`}
-              disabled={!isUserLoggedIn}
             >
-              {isUserLoggedIn ? 'Subscribe Now' : 'Signup and Pay!'}
+              {isLoggedIn ? 'Subscribe Now' : 'Signup and Pay!'}
             </button>
-
           </div>
         ))}
       </div>
 
-      {/* Modal for Subscription Flow */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-white p-6 rounded-lg w-80">
-            {!isUserLoggedIn ? (
-              <div>
-                <h2 className="text-xl font-bold mb-2">You're not logged in</h2>
-                <p className="mb-4">To subscribe, you need to create an account.</p>
-                <button
-                  onClick={handleLoginAndSubscribe}
-                  className="bg-green-500 text-white py-2 px-4 rounded-full w-full"
-                >
-                  Create an Account
-                </button>
-              </div>
-            ) : (
+            {isLoggedIn ? (
               <div>
                 <h2 className="text-xl font-bold mb-2">Ready to Subscribe!</h2>
                 <p className="mb-4">Proceeding with your subscription...</p>
@@ -158,9 +153,20 @@ export default function Subscribe() {
                   Subscribe Now
                 </button>
               </div>
+            ) : (
+              <div>
+                <h2 className="text-xl font-bold mb-2">You're not logged in</h2>
+                <p className="mb-4">To subscribe, you need to create an account.</p>
+                <button
+                  onClick={handleLoginAndSubscribe}
+                  className="bg-green-500 text-white py-2 px-4 rounded-full w-full"
+                >
+                  Create an Account
+                </button>
+              </div>
             )}
             <button
-              onClick={() => setIsModalOpen(false)} // Close modal on cancel
+              onClick={() => setIsModalOpen(false)}
               className="mt-4 py-2 px-4 rounded-full bg-red-500 text-white w-full"
             >
               Cancel

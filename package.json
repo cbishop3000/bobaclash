@@ -17,6 +17,7 @@
     "bcryptjs": "^3.0.2",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.477.0",
+    "micro": "^10.0.1",
     "motion": "^12.9.1",
     "next": "15.2.1",
     "react": "^19.1.0",

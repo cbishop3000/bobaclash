@@ -40,7 +40,7 @@ export default function Home() {
             <Link className="p-3 m-2 text-lg bg-amber-500 hover:bg-amber-400 rounded-lg shadow-lg transition duration-300" href="/subscribe">
               Join the Family
             </Link>
-            <Link className="p-3 m-2 text-lg bg-amber-500 hover:bg-amber-400 rounded-lg shadow-lg transition duration-300" href="/subscribe">
+            <Link className="p-3 m-2 text-lg bg-amber-500 hover:bg-amber-400 rounded-lg shadow-lg transition duration-300" href="https://order.rezku.com/Clash">
               Make an Order
             </Link>
           </div>

@@ -1,20 +1,16 @@
-'use client';
+"use client"
 
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  ReactNode,
-} from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 interface User {
   id: string;
   email: string;
+  role: 'USER' | 'ADMIN'; // Add role information
 }
 
 interface AuthContextType {
   isLoggedIn: boolean;
+  isAdmin: boolean; // Easily check if user is an admin
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -37,13 +33,14 @@ interface AuthProviderProps {
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
   const isLoggedIn = Boolean(user);
+  const isAdmin = user?.role === 'ADMIN'; // Check if the user is an admin
 
   const fetchUser = async () => {
     try {
       const res = await fetch('/api/me');
       if (res.ok) {
         const data = await res.json();
-        setUser(data.user);
+        setUser(data.user); // Set the user info from the backend
       } else {
         setUser(null);
       }
@@ -53,32 +50,30 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   useEffect(() => {
-    fetchUser();
+    fetchUser(); // Fetch user data on initial load
   }, []);
 
   const login = async (email: string, password: string) => {
     const res = await fetch('/api/login', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
 
     if (res.ok) {
-      await fetchUser(); // get user from cookie after login
+      await fetchUser(); // Rehydrate context with logged-in user
     } else {
       throw new Error('Login failed');
     }
   };
 
   const logout = async () => {
-    await fetch('/api/logout'); // you’ll need to build this route too
-    setUser(null);
+    await fetch('/api/logout');
+    setUser(null); // Clear user on logout
   };
 
   return (
-    <AuthContext.Provider value={{ isLoggedIn, user, login, logout }}>
+    <AuthContext.Provider value={{ isLoggedIn, isAdmin, user, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

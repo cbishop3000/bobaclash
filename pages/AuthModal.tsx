@@ -1,28 +1,55 @@
-"use client"
-import { useState } from "react";
+"use client";
+import { useState, useEffect } from "react";
 import { useModal } from "../app/context/ModalContext";
 
-const AuthModal = () => {
-  const { isOpen, closeModal } = useModal();
+type AuthModalProps = {
+  defaultMode?: "login" | "signup";
+};
 
-  const [isLogin, setIsLogin] = useState(true); // This is where we declare setIsLogin
+const AuthModal = ({ defaultMode = "login" }: AuthModalProps) => {
+  const { isOpen, closeModal, modalType, setModalType } = useModal();
+
+  // Sync defaultMode with modalType when the modal opens
+  useEffect(() => {
+    if (defaultMode) {
+      setModalType(defaultMode);
+    }
+  }, [defaultMode, setModalType]);
+
+  const isLogin = modalType === "login";
+
   const [form, setForm] = useState({
     email: "",
     password: "",
     name: "",
-    confirmPassword: ""
+    confirmPassword: "",
   });
+
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const handleChange = (e: React.ChangeEvent<any>) => {
+  // Handle form input changes
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  // Reset form on modal close
+  useEffect(() => {
+    if (!isOpen) {
+      setForm({
+        email: "",
+        password: "",
+        name: "",
+        confirmPassword: "",
+      });
+      setErrorMessage(""); // Clear error message when modal is closed
+    }
+  }, [isOpen]);
+
+  // Handle login action
   const handleLogin = async () => {
     setLoading(true);
     setErrorMessage("");
-
     const { email, password } = form;
 
     try {
@@ -36,8 +63,8 @@ const AuthModal = () => {
 
       if (response.ok) {
         localStorage.setItem("token", data.token);
-        alert("Login successful!");
         closeModal();
+        window.location.reload();  // Refresh the page and redirect to home page
       } else {
         setErrorMessage(data.error || "Something went wrong");
       }
@@ -48,10 +75,10 @@ const AuthModal = () => {
     }
   };
 
+  // Handle signup action
   const handleSignup = async () => {
     setLoading(true);
     setErrorMessage("");
-
     const { name, email, password, confirmPassword } = form;
 
     if (password !== confirmPassword) {
@@ -70,8 +97,8 @@ const AuthModal = () => {
       const data = await response.json();
 
       if (response.ok) {
-        alert("Sign Up successful!");
         closeModal();
+        window.location.reload();  // Refresh the page and redirect to home page
       } else {
         setErrorMessage(data.error || "Something went wrong");
       }
@@ -82,15 +109,22 @@ const AuthModal = () => {
     }
   };
 
+  // Don't render modal if it's not open
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
       <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full">
-        <h2 className="text-xl font-semibold mb-4">{isLogin ? "Login" : "Sign Up"}</h2>
+        <h2 className="text-xl font-semibold mb-4">
+          {isLogin ? "Login" : "Sign Up"}
+        </h2>
 
-        {errorMessage && <p className="text-red-500 text-sm mb-4">{errorMessage}</p>}
+        {/* Error message */}
+        {errorMessage && (
+          <p className="text-red-500 text-sm mb-4">{errorMessage}</p>
+        )}
 
+        {/* Name input (only shown during sign up) */}
         {!isLogin && (
           <input
             type="text"
@@ -102,6 +136,7 @@ const AuthModal = () => {
           />
         )}
 
+        {/* Email input */}
         <input
           type="email"
           name="email"
@@ -111,6 +146,7 @@ const AuthModal = () => {
           className="w-full mb-2 p-2 border border-gray-300 rounded"
         />
 
+        {/* Password input */}
         <input
           type="password"
           name="password"
@@ -120,6 +156,7 @@ const AuthModal = () => {
           className="w-full mb-2 p-2 border border-gray-300 rounded"
         />
 
+        {/* Confirm password (only shown during sign up) */}
         {!isLogin && (
           <input
             type="password"
@@ -131,14 +168,22 @@ const AuthModal = () => {
           />
         )}
 
+        {/* Submit button */}
         <button
           onClick={isLogin ? handleLogin : handleSignup}
           className="w-full bg-amber-900 text-white py-2 rounded hover:bg-amber-100 mt-2"
           disabled={loading}
         >
-          {loading ? (isLogin ? "Logging In..." : "Signing Up...") : isLogin ? "Login" : "Sign Up"}
+          {loading
+            ? isLogin
+              ? "Logging In..."
+              : "Signing Up..."
+            : isLogin
+            ? "Login"
+            : "Sign Up"}
         </button>
 
+        {/* Close button */}
         <button
           onClick={closeModal}
           className="w-full mt-2 text-gray-500 text-sm"
@@ -146,11 +191,12 @@ const AuthModal = () => {
           Close
         </button>
 
+        {/* Toggle between Login/Signup */}
         <div className="mt-2 text-center text-sm">
           <span>
             {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
             <button
-              onClick={() => setIsLogin(!isLogin)} // Now this works because setIsLogin is defined!
+              onClick={() => setModalType(isLogin ? "signup" : "login")}
               className="text-blue-500 underline"
             >
               {isLogin ? "Sign up" : "Log in"}
