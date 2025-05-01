@@ -1,22 +1,25 @@
+// pages/api/create-checkout-session.ts
+
 import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: '2025-02-24.acacia', // Or latest
+  apiVersion: '2025-02-24.acacia',
 });
 
 interface CreateCheckoutSessionBody {
   priceId: string;
+  email: string; // <- added
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'POST') {
     try {
-      const { priceId }: CreateCheckoutSessionBody = req.body;
+      const { priceId, email }: CreateCheckoutSessionBody = req.body;
 
-      if (!priceId) {
-        console.error('Missing priceId');
-        return res.status(400).json({ error: 'Missing priceId' });
+      if (!priceId || !email) {
+        console.error('Missing priceId or email');
+        return res.status(400).json({ error: 'Missing priceId or email' });
       }
 
       const session = await stripe.checkout.sessions.create({
@@ -28,15 +31,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           },
         ],
         mode: 'subscription',
+        customer_email: email, // <- THIS FIXES YOUR WEBHOOK ISSUE
         success_url: `${process.env.NEXT_PUBLIC_URL}/subscribe`,
         cancel_url: `${process.env.NEXT_PUBLIC_URL}/cancel`,
       });
 
-      console.log('Checkout session created:', session.id);
-
+      console.log('✅ Checkout session created:', session.id);
       res.status(200).json({ id: session.id });
+
     } catch (error: any) {
-      console.error('Error creating checkout session:', error.message);
+      console.error('❌ Error creating checkout session:', error.message);
       res.status(500).json({ error: error.message });
     }
   } else {

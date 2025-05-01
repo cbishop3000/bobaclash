@@ -73,7 +73,7 @@ export default function Subscribe() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ priceId }),
+        body: JSON.stringify({ priceId, email: user?.email }),
       });
 
       if (!response.ok) {
