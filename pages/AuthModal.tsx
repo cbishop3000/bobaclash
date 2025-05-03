@@ -23,6 +23,7 @@ const AuthModal = ({ defaultMode = "login" }: AuthModalProps) => {
     password: "",
     name: "",
     confirmPassword: "",
+    address: "",  // New field for address
   });
 
   const [loading, setLoading] = useState(false);
@@ -41,6 +42,7 @@ const AuthModal = ({ defaultMode = "login" }: AuthModalProps) => {
         password: "",
         name: "",
         confirmPassword: "",
+        address: "", // Reset address field
       });
       setErrorMessage(""); // Clear error message when modal is closed
     }
@@ -79,7 +81,7 @@ const AuthModal = ({ defaultMode = "login" }: AuthModalProps) => {
   const handleSignup = async () => {
     setLoading(true);
     setErrorMessage("");
-    const { name, email, password, confirmPassword } = form;
+    const { name, email, password, confirmPassword, address } = form;
 
     if (password !== confirmPassword) {
       setErrorMessage("Passwords do not match!");
@@ -91,7 +93,7 @@ const AuthModal = ({ defaultMode = "login" }: AuthModalProps) => {
       const response = await fetch("/api/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: name, email, password }),
+        body: JSON.stringify({ username: name, email, password, address }),  // Include address in the request body
       });
 
       const data = await response.json();
@@ -163,6 +165,18 @@ const AuthModal = ({ defaultMode = "login" }: AuthModalProps) => {
             name="confirmPassword"
             placeholder="Confirm Password"
             value={form.confirmPassword}
+            onChange={handleChange}
+            className="w-full mb-2 p-2 border border-gray-300 rounded"
+          />
+        )}
+
+        {/* Address input (only shown during sign up) */}
+        {!isLogin && (
+          <input
+            type="text"
+            name="address"
+            placeholder="Address"
+            value={form.address}
             onChange={handleChange}
             className="w-full mb-4 p-2 border border-gray-300 rounded"
           />

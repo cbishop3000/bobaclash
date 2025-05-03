@@ -5,16 +5,16 @@ import prisma from '../../lib/prisma';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
 
-// Utility function to map priceId → subscriptionTier
-const getTierFromPriceId = (priceId: string): 'LIKE' | 'LOVE' | 'NEED' | 'CLASHOHOLIC' => {
-  const mapping: { [key: string]: 'LIKE' | 'LOVE' | 'NEED' | 'CLASHOHOLIC' } = {
-    'price_like': 'LIKE',
-    'price_love': 'LOVE',
-    'price_need': 'NEED',
-    'price_clashoholic': 'CLASHOHOLIC',
+// Utility function to map priceId → subscriptionTier (enum)
+const getTierFromPriceId = (priceId: string): 'CLASHAHOLIC' | 'I_NEED_COFFEE' | 'I_LOVE_COFFEE' | 'I_LIKE_COFFEE' => {
+  const mapping: { [key: string]: 'CLASHAHOLIC' | 'I_NEED_COFFEE' | 'I_LOVE_COFFEE' | 'I_LIKE_COFFEE' } = {
+    'price_like': 'I_LIKE_COFFEE',
+    'price_love': 'I_LOVE_COFFEE',
+    'price_need': 'I_NEED_COFFEE',
+    'price_clashaholic': 'CLASHAHOLIC',
   };
 
-  return mapping[priceId] ?? 'LIKE'; // default fallback
+  return mapping[priceId] ?? 'I_LIKE_COFFEE'; // default fallback if priceId doesn't match
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -41,7 +41,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           email,
           password: hashedPassword,
           stripeCustomerId: '', // we’ll update after Stripe customer is created
-          subscriptionTier: getTierFromPriceId(priceId),
+          subscriptionTier: getTierFromPriceId(priceId), // use enum value here
         },
       });
     }

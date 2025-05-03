@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// Function to get the cookie value by name
 const getCookie = (cookieHeader: string | undefined, name: string): string | null => {
   if (!cookieHeader) return null;
   const cookies = cookieHeader.split(';').map(cookie => cookie.trim());
@@ -20,33 +21,45 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    // Get the token from cookies
     const token = getCookie(req.headers.cookie, 'authToken');
-
     if (!token) {
       console.log('Token not found in cookies');
-      return res.status(401).json({ error: 'Not authenticated' });
+      return res.status(401).json({ error: 'Authentication token missing' });
     }
 
+    // Verify the token and extract userId
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { userId: string };
+    
+    // Fetch user from database using the userId from the decoded token
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
     });
 
+    // Handle case where user is not found
     if (!user) {
-      console.log('User not found');
+      console.log('User not found with the given token');
       return res.status(401).json({ error: 'User not found' });
     }
 
-    // Return the user along with the role (e.g., 'USER' or 'ADMIN')
+    // Respond with user data, including role
     return res.status(200).json({
       user: {
         id: user.id,
         email: user.email,
-        role: user.role,  // Make sure to include the role in your database schema
+        role: user.role,  // Make sure to include the 'role' field in your database schema
       },
     });
-  } catch (err) {
+
+  } catch (err: unknown) {
     console.error('Error verifying token:', err);
+
+    // Type assertion to ensure `err` is treated as an `Error`
+    if (err instanceof Error) {
+      return res.status(401).json({ error: 'Invalid or expired token', details: err.message });
+    }
+
+    // If error is not an instance of Error, return a generic error
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 }

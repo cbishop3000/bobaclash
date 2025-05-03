@@ -1,103 +1,99 @@
-// pages/api/webhook.ts
+import { buffer } from 'micro';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
-import { buffer } from 'micro';
-import prisma from '../../lib/prisma';        // ← adjust if your prisma client is elsewhere
-import { SubscriptionTier } from '@prisma/client';
+import prisma from '@/lib/prisma'; // Adjust path if needed
 
 export const config = {
   api: {
-    bodyParser: false,                       // ← disable built-in parser so we can verify Stripe’s signature
+    bodyParser: false, // Disable body parsing to handle raw Stripe webhook
   },
 };
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-02-24.acacia',
+  apiVersion: '2025-02-24.acacia', // Ensure you're using the correct Stripe API version
 });
-const endpointSecret = process.env.STRIPE_ENDPOINT_SECRET!;
+
+// Define SubscriptionTier enum as per Prisma schema (with uppercase values)
+type SubscriptionTier = 'CLASHAHOLIC' | 'I_NEED_COFFEE' | 'I_LOVE_COFFEE' | 'I_LIKE_COFFEE';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Only accept POST
-  if (req.method !== 'POST') return res.status(405).end('Method Not Allowed');
+  if (req.method === 'POST') {
+    const sig = req.headers['stripe-signature']!;
+    const buf = await buffer(req);
 
-  // 1) Read raw body
-  let buf: Buffer;
-  try {
-    buf = await buffer(req);
-  } catch (err) {
-    console.error('Error reading raw body:', err);
-    return res.status(500).end('Server Error');
-  }
+    const webhookSecret = process.env.STRIPE_ENDPOINT_SECRET;
 
-  // 2) Verify Stripe signature
-  const sig = req.headers['stripe-signature']!;
-  let event: Stripe.Event;
-  try {
-    event = stripe.webhooks.constructEvent(buf, sig, endpointSecret);
-  } catch (err: any) {
-    console.error('⚠️  Webhook signature verification failed.', err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
-
-  // 3) Handle the event
-  if (event.type === 'checkout.session.completed') {
-    const session = event.data.object as Stripe.Checkout.Session;
-
-    const customerEmail = session.customer_email;
-    if (!customerEmail) {
-      console.warn('No customer email on session—skipping.');
-      return res.status(400).json({ error: 'Missing customer email' });
+    if (!webhookSecret) {
+      console.error('❌ STRIPE_WEBHOOK_SECRET is not set!');
+      return res.status(500).send('Webhook secret not found');
     }
 
-    // Pull the single line item
-    let priceId: string | undefined;
+    let event: Stripe.Event;
+
     try {
-      const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 1 });
-      priceId = lineItems.data[0]?.price?.id;
+      // Construct the event using the raw body (buf) and signature
+      event = stripe.webhooks.constructEvent(buf, sig, webhookSecret);
     } catch (err) {
-      console.error('Error fetching line items:', err);
-      return res.status(500).end('Server Error');
+      console.error(`❌ Webhook Error: ${(err as Error).message}`);
+      return res.status(400).send(`Webhook Error: ${(err as Error).message}`);
     }
 
-    if (!priceId) {
-      console.warn('No priceId on line item—skipping.');
-      return res.status(400).json({ error: 'Missing price ID' });
+    console.log('Received event:', event.type); // Log the event type for debugging
+
+    // Only handle the "checkout.session.completed" event
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object as Stripe.Checkout.Session;
+
+      // Extract necessary details from the session
+      const customerEmail = session.customer_email ?? 'unknown@example.com'; // Safely handle missing email
+      const stripeCustomerId = session.customer as string;
+
+      // Get subscription ID from session
+      const subscriptionId = session.subscription as string;
+
+      try {
+        // Retrieve subscription details from Stripe
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+        const priceId = subscription.items.data[0].price.id;
+
+        // Map Stripe price ID to internal subscription tier (ensure keys match the Prisma Enum)
+        const tierMap: { [key: string]: SubscriptionTier } = {
+          'price_1RFjlBHyP3FLprp1stDcSwmc': 'CLASHAHOLIC',
+          'price_1RFjkhHyP3FLprp1dzlAwJCp': 'I_NEED_COFFEE',
+          'price_1RFjjOHyP3FLprp1t7p5AOwM': 'I_LOVE_COFFEE',
+          'price_1RFjiLHyP3FLprp1YhkDlNA3': 'I_LIKE_COFFEE',
+        };
+
+        // Determine the subscription tier based on priceId
+        const subscriptionTier = tierMap[priceId];
+
+        if (!subscriptionTier) {
+          console.error(`❌ Unknown priceId: ${priceId}`);
+          return res.status(400).send('Unknown subscription tier.');
+        }
+
+        // Update the user record in your Prisma database
+        await prisma.user.update({
+          where: { email: customerEmail },
+          data: {
+            stripeCustomerId,
+            subscriptionTier, // Now type-safe and consistent with Prisma schema
+            isNewSubscriber: false, // Mark as not new after first subscription
+          },
+        });
+
+        console.log(`✅ Updated user ${customerEmail} with tier: ${subscriptionTier}`);
+      } catch (updateErr) {
+        console.error(`❌ Failed to update user for email ${customerEmail}:`, updateErr);
+        return res.status(500).send('Database update failed.');
+      }
     }
 
-    // Map to your enum
-    const subscriptionTier = getSubscriptionTier(priceId);
-    if (!subscriptionTier) {
-      console.warn('Unrecognized priceId:', priceId);
-      return res.status(400).json({ error: 'Invalid subscription tier' });
-    }
-
-    // Update the user record
-    try {
-      await prisma.user.update({
-        where: { email: customerEmail },
-        data: {
-          subscriptionTier: { set: subscriptionTier },
-          stripeCustomerId: session.customer as string, // 🟢 Save customer ID here
-        },
-      });
-      console.log(`✅ Updated ${customerEmail} with ${subscriptionTier} and customer ID.`);
-    } catch (err) {
-      console.error('Database update failed:', err);
-      return res.status(500).end('Server Error');
-    }
+    // Respond with a success message after processing
+    res.status(200).json({ received: true });
+  } else {
+    // If the method is not POST, return a Method Not Allowed error
+    res.setHeader('Allow', 'POST');
+    res.status(405).end('Method Not Allowed');
   }
-
-  // Acknowledge receipt
-  res.status(200).json({ received: true });
-}
-
-// Helper: map Stripe price IDs → your Prisma enum
-function getSubscriptionTier(priceId: string): SubscriptionTier | null {
-  const map: Record<string, SubscriptionTier> = {
-    'price_1RFjlBHyP3FLprp1stDcSwmc': 'CLASHOHOLIC',
-    'price_1RFjkhHyP3FLprp1dzlAwJCp': 'NEED',
-    'price_1RFjjOHyP3FLprp1t7p5AOwM': 'LOVE',
-    'price_1RFjiLHyP3FLprp1YhkDlNA3': 'LIKE',
-  };
-  return map[priceId] ?? null;
 }

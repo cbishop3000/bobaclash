@@ -5,7 +5,11 @@ import bcrypt from 'bcryptjs';  // For hashing the password
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'POST') {
-    const { email, password } = req.body;
+    const { email, password, username, address } = req.body;  // Include address
+
+    if (!email || !password || !username || !address) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
 
     try {
       // Hash the password before storing it
@@ -16,6 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         data: {
           email,
           password: hashedPassword,  // Store the hashed password
+          address,  // Store the address
         },
       });
 
