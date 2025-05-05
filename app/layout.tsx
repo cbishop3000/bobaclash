@@ -5,7 +5,7 @@ import Navbar from "./components/navbar";
 
 import { ModalProvider } from "./context/ModalContext"; 
 import { AuthProvider } from "./context/AuthContext";   
-import AuthModal from "@/pages/AuthModal";
+import AuthModal from "./components/AuthModal";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useModal } from '../context/ModalContext';
 import { useAuth } from '../context/AuthContext'; // Use AuthContext here
-import AuthModal from '@/pages/AuthModal';
+import AuthModal from './AuthModal';
 
 const Logo = './logo.png'; // Ensure this path to your logo is correct
 

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useModal } from "../app/context/ModalContext";
+import { useModal } from "../context/ModalContext";
 
 type AuthModalProps = {
   defaultMode?: "login" | "signup";
