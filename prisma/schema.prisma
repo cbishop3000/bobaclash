@@ -8,45 +8,32 @@ datasource db {
 }
 
 model User {
-  id               String   @id @default(cuid())
-  email            String   @unique
-  password         String   // hashed!
-  role             UserRole    @default(USER) 
-  stripeCustomerId String?  // ✅ make optional
-  subscriptionTier SubscriptionTier? // ✅ make optional
-  isNewSubscriber  Boolean  @default(true)
-  merchSent        Boolean  @default(false)
-  address          String?  // Optional address field for now
+  id               String            @id @default(cuid())
+  email            String            @unique
+  password         String
+  stripeCustomerId String?
+  subscriptionTier SubscriptionTier?
+  isNewSubscriber  Boolean           @default(true)
+  merchSent        Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  role             UserRole          @default(USER)
+  address          String?
+  lastDeliveryDate DateTime?
   deliveries       DeliveryLog[]
-  lastDeliveryDate DateTime?  // <-- Add this line
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-}
-
-enum UserRole {
-  USER
-  ADMIN
 }
 
 model DeliveryLog {
   id        String   @id @default(cuid())
-  user      User     @relation(fields: [userId], references: [id])
   userId    String
   shippedAt DateTime @default(now())
-  items     String   // JSON or plain description of what was shipped
+  items     String
+  user      User     @relation(fields: [userId], references: [id])
 }
-
-enum SubscriptionTier {
-  CLASHAHOLIC
-  I_NEED_COFFEE
-  I_LOVE_COFFEE
-  I_LIKE_COFFEE
-}
-
 
 model Plan {
   id              Int      @id @default(autoincrement())
-  stripeProductId String   // Ensure this field exists in the schema
+  stripeProductId String
   stripePriceId   String
   title           String
   description     String
@@ -58,6 +45,14 @@ model Plan {
   address         String?
 }
 
+enum UserRole {
+  USER
+  ADMIN
+}
 
-
-
+enum SubscriptionTier {
+  CLASHAHOLIC
+  I_NEED_COFFEE
+  I_LOVE_COFFEE
+  I_LIKE_COFFEE
+}
