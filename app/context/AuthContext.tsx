@@ -1,5 +1,4 @@
 "use client"
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 interface User {
@@ -68,8 +67,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   const logout = async () => {
-    await fetch('/api/logout');
-    setUser(null); // Clear user on logout
+    await fetch('/api/logout', { method: 'POST' }); // Call API to log out
+    setUser(null); // Clear user from state
+    window.location.reload(); // Refresh the page to ensure proper logout on the frontend
   };
 
   return (

@@ -1,5 +1,5 @@
-"use client";
-import { useState } from 'react';
+"use client"
+import { useState, useEffect } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { useAuth } from "@/app/context/AuthContext";
 
@@ -15,6 +15,35 @@ export default function Subscribe() {
   const { isLoggedIn, user } = useAuth();
   const [priceId, setPriceId] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    const fetchSubscription = async () => {
+      if (!user?.email) return;
+
+      const res = await fetch('/api/get-subs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email }),
+      });
+
+      const data = await res.json();
+
+      if (data.subscriptionTier) {
+        // Map subscriptionTier to the appropriate priceId
+        const tierMapping: { [key in string]: string } = {
+          'CLASHAHOLIC': 'price_1RFjlBHyP3FLprp1stDcSwmc',
+          'I_NEED_COFFEE': 'price_1RFjkhHyP3FLprp1dzlAwJCp',
+          'I_LOVE_COFFEE': 'price_1RFjjOHyP3FLprp1t7p5AOwM',
+          'I_LIKE_COFFEE': 'price_1RFjiLHyP3FLprp1YhkDlNA3',
+        };
+
+        // Set the priceId based on subscriptionTier
+        setPriceId(tierMapping[data.subscriptionTier] || '');
+      }
+    };
+
+    fetchSubscription();
+  }, [user]);
 
   const subscriptionInfo: SubscriptionInfo[] = [
     {
@@ -66,8 +95,6 @@ export default function Subscribe() {
 
   const handleSubscription = async () => {
     if (isLoggedIn && priceId) {
-      console.log('Processing subscription for priceId:', priceId);
-
       const response = await fetch('/api/create-checkout-session', {
         method: 'POST',
         headers: {
@@ -82,7 +109,6 @@ export default function Subscribe() {
       }
 
       const session = await response.json();
-
       const stripeInstance = await loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
 
       if (!stripeInstance) {
@@ -99,7 +125,6 @@ export default function Subscribe() {
   };
 
   const handleLoginAndSubscribe = () => {
-    console.log('Redirecting to login or account creation...');
     window.location.href = '/login';
   };
 
@@ -109,7 +134,18 @@ export default function Subscribe() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {subscriptionInfo.map((info, index) => (
-          <div key={index} className="bg-white shadow-lg rounded-lg p-6">
+          <div
+            key={index}
+            className={`relative bg-white shadow-lg rounded-lg p-6 border-4 transition-all duration-300 ${
+              priceId === info.stripePriceId ? 'border-green-500' : 'border-transparent'
+            }`}
+          >
+            {priceId === info.stripePriceId && (
+              <span className="absolute top-2 right-2 bg-green-500 text-white text-xs font-semibold px-2 py-1 rounded-full">
+                Current Plan
+              </span>
+            )}
+
             <h2 className="text-2xl font-semibold mb-2">{info.title}</h2>
             <p className="text-gray-700 mb-4 whitespace-pre-line">{info.description}</p>
             <p className="text-xl font-bold mb-4">{`$${(info.priceCents / 100).toFixed(2)} / month`}</p>
@@ -122,18 +158,23 @@ export default function Subscribe() {
 
             <button
               onClick={() => {
-                if (!isLoggedIn) {
-                  handleLoginAndSubscribe();
-                } else {
+                if (isLoggedIn && priceId !== info.stripePriceId) {
                   setPriceId(info.stripePriceId);
+                  setIsModalOpen(true);
+                } else if (!isLoggedIn) {
                   setIsModalOpen(true);
                 }
               }}
+              disabled={priceId === info.stripePriceId}
               className={`mt-4 py-2 px-4 rounded-full w-full ${
-                isLoggedIn ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-400 text-white cursor-not-allowed'
+                priceId === info.stripePriceId
+                  ? 'bg-green-600 text-white cursor-default'
+                  : isLoggedIn
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-gray-400 text-white hover:bg-gray-500'
               }`}
             >
-              {isLoggedIn ? 'Subscribe Now' : 'Signup and Pay!'}
+              {priceId === info.stripePriceId ? 'Current Plan' : isLoggedIn ? 'Subscribe Now' : 'Signup and Pay!'}
             </button>
           </div>
         ))}

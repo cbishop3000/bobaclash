@@ -12,6 +12,7 @@ model User {
   email            String            @unique
   password         String
   stripeCustomerId String?
+  stripePriceId    String?           // Added field for stripePriceId
   subscriptionTier SubscriptionTier?
   isNewSubscriber  Boolean           @default(true)
   merchSent        Boolean           @default(false)

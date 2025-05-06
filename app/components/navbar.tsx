@@ -1,11 +1,10 @@
-'use client';
-
+"use client"
+import React, { useState } from 'react';
 import { Disclosure, DisclosureButton, DisclosurePanel } from '@headlessui/react';
-import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
+import { Bars3Icon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
-import { useModal } from '../context/ModalContext';
 import { useAuth } from '../context/AuthContext'; // Use AuthContext here
+import { useModal } from '../context/ModalContext';
 import AuthModal from './AuthModal';
 
 const Logo = './logo.png'; // Ensure this path to your logo is correct
@@ -28,7 +27,8 @@ export default function Navbar() {
 
   // Handle user logout
   const handleLogout = async () => {
-    await logout();
+    await logout(); // Ensure the logout process completes from context
+    window.location.reload(); // Refresh the page after logging out
   };
 
   return (
@@ -42,7 +42,7 @@ export default function Navbar() {
               <Bars3Icon className="h-6 w-6" aria-hidden="true" />
             </DisclosureButton>
           </div>
-          
+
           {/* Logo and Navigation Links */}
           <div className="flex flex-1 items-center justify-center sm:items-stretch sm:justify-start">
             <div className="flex shrink-0 items-center">

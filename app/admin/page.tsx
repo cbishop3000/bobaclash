@@ -29,22 +29,26 @@ export default function AdminDashboard() {
   }, [isLoggedIn, user, router]);
 
   useEffect(() => {
-    if (user?.role === 'ADMIN') {
-      const fetchUsers = async () => {
-        try {
-          const response = await fetch('/api/get-subs');
-          const data = await response.json();
+    const fetchSubscribedUsers = async () => {
+      try {
+        const response = await fetch('/api/get-subscriptions');
+        const data = await response.json();
+        
+        // Check if the data is an array before setting it
+        if (Array.isArray(data)) {
           setUsers(data);
-          setLoadingUsers(false);
-        } catch (error) {
-          console.error('Error fetching users:', error);
-          setLoadingUsers(false);
+        } else {
+          console.error('Error: Received data is not an array');
         }
-      };
+      } catch (error) {
+        console.error('Error fetching subscribed users:', error);
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
 
-      fetchUsers();
-    }
-  }, [user?.role]);
+    fetchSubscribedUsers();
+  }, []);
 
   const filteredUsers = users.filter((user) => {
     const lower = searchTerm.toLowerCase();
