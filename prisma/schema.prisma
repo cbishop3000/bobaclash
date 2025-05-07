@@ -12,16 +12,34 @@ model User {
   email            String            @unique
   password         String
   stripeCustomerId String?
-  stripePriceId    String?           // Added field for stripePriceId
+  stripePriceId    String?
   subscriptionTier SubscriptionTier?
   isNewSubscriber  Boolean           @default(true)
   merchSent        Boolean           @default(false)
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   role             UserRole          @default(USER)
-  address          String?
+  addressStreet    String?
+  addressUnit      String?
+  addressCity      String?
+  addressState     String?
+  addressPostalCode String?
+  addressCountry   String?
+  addressFormatted String?
+  phone            String?
   lastDeliveryDate DateTime?
   deliveries       DeliveryLog[]
+  cancellations    CancellationLog[] 
+}
+
+model CancellationLog {
+  id              String   @id @default(cuid())
+  userId          String
+  cancellationStatus String // e.g., 'pending', 'success', 'failed'
+  cancellationDate DateTime @default(now())
+  reason          String?  // Optional, stores cancellation reason if any
+  errorMessage    String?  // Optional, stores error message if something went wrong
+  user            User     @relation(fields: [userId], references: [id])
 }
 
 model DeliveryLog {

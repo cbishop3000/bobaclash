@@ -48,6 +48,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         id: user.id,
         email: user.email,
         role: user.role,  // Make sure to include the 'role' field in your database schema
+        stripeCustomerId: user.stripeCustomerId
       },
     });
 

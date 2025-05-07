@@ -5,6 +5,7 @@ interface User {
   id: string;
   email: string;
   role: 'USER' | 'ADMIN'; // Add role information
+  stripeCustomerId: string | null; // Add stripeCustomerId
 }
 
 interface AuthContextType {
@@ -39,7 +40,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       const res = await fetch('/api/me');
       if (res.ok) {
         const data = await res.json();
-        setUser(data.user); // Set the user info from the backend
+        setUser(data.user); // Assuming backend sends user object with stripeCustomerId
       } else {
         setUser(null);
       }

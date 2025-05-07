@@ -23,8 +23,13 @@ const AuthModal = ({ defaultMode = "login" }: AuthModalProps) => {
     password: "",
     name: "",
     confirmPassword: "",
-    address: "",  // New field for address
-  });
+    addressStreet: "",  // Renamed from addressLine1
+    addressUnit: "",    // Renamed from addressLine2
+    city: "",
+    state: "",
+    zip: "",
+    phone: "",
+  });  
 
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -34,7 +39,6 @@ const AuthModal = ({ defaultMode = "login" }: AuthModalProps) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  // Reset form on modal close
   useEffect(() => {
     if (!isOpen) {
       setForm({
@@ -42,11 +46,17 @@ const AuthModal = ({ defaultMode = "login" }: AuthModalProps) => {
         password: "",
         name: "",
         confirmPassword: "",
-        address: "", // Reset address field
+        addressStreet: "",  // Reset street address
+        addressUnit: "",    // Reset unit (if applicable)
+        city: "",           // Reset city
+        state: "",          // Reset state
+        zip: "",            // Reset zip code
+        phone: "",          // Reset phone number
       });
-      setErrorMessage(""); // Clear error message when modal is closed
+      setErrorMessage("");  // Clear error message when modal is closed
     }
   }, [isOpen]);
+  
 
   // Handle login action
   const handleLogin = async () => {
@@ -81,23 +91,41 @@ const AuthModal = ({ defaultMode = "login" }: AuthModalProps) => {
   const handleSignup = async () => {
     setLoading(true);
     setErrorMessage("");
-    const { name, email, password, confirmPassword, address } = form;
-
+    const { name, email, password, confirmPassword, addressStreet, addressUnit, city, state, zip, phone } = form;
+  
+    // Validate required fields
+    if (!addressStreet || !city || !state || !zip || !phone) {
+      setErrorMessage("All address fields except unit are required.");
+      setLoading(false);
+      return;
+    }
+  
     if (password !== confirmPassword) {
       setErrorMessage("Passwords do not match!");
       setLoading(false);
       return;
     }
-
+  
     try {
       const response = await fetch("/api/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: name, email, password, address }),  // Include address in the request body
+        body: JSON.stringify({
+          username: name,
+          email,
+          password,
+          addressStreet,
+          addressUnit,
+          addressCity: city,
+          addressState: state,
+          addressPostalCode: zip,
+          addressCountry: "USA",           // Or however you're getting this
+          addressFormatted: `${addressStreet}, ${city}, ${state} ${zip}, USA`, // Optional
+        }),
       });
-
+  
       const data = await response.json();
-
+  
       if (response.ok) {
         closeModal();
         window.location.reload();  // Refresh the page and redirect to home page
@@ -109,7 +137,7 @@ const AuthModal = ({ defaultMode = "login" }: AuthModalProps) => {
     } finally {
       setLoading(false);
     }
-  };
+  };  
 
   // Don't render modal if it's not open
   if (!isOpen) return null;
@@ -170,16 +198,63 @@ const AuthModal = ({ defaultMode = "login" }: AuthModalProps) => {
           />
         )}
 
-        {/* Address input (only shown during sign up) */}
+        {/* Address fields (only shown during sign up) */}
         {!isLogin && (
-          <input
-            type="text"
-            name="address"
-            placeholder="Address"
-            value={form.address}
-            onChange={handleChange}
-            className="w-full mb-4 p-2 border border-gray-300 rounded"
-          />
+          <>
+            <input
+              type="text"
+              name="addressStreet"
+              placeholder="Street Address (required)"
+              value={form.addressStreet}
+              onChange={handleChange}
+              className="w-full mb-2 p-2 border border-gray-300 rounded"
+              required
+            />
+            <input
+              type="text"
+              name="addressUnit"
+              placeholder="Apartment/Unit (optional)"
+              value={form.addressUnit}
+              onChange={handleChange}
+              className="w-full mb-2 p-2 border border-gray-300 rounded"
+            />
+            <input
+              type="text"
+              name="city"
+              placeholder="City (required)"
+              value={form.city}
+              onChange={handleChange}
+              className="w-full mb-2 p-2 border border-gray-300 rounded"
+              required
+            />
+            <input
+              type="text"
+              name="state"
+              placeholder="State (required)"
+              value={form.state}
+              onChange={handleChange}
+              className="w-full mb-2 p-2 border border-gray-300 rounded"
+              required
+            />
+            <input
+              type="text"
+              name="zip"
+              placeholder="ZIP Code (required)"
+              value={form.zip}
+              onChange={handleChange}
+              className="w-full mb-2 p-2 border border-gray-300 rounded"
+              required
+            />
+            <input
+              type="text"
+              name="phone"
+              placeholder="Phone Number (required)"
+              value={form.phone}
+              onChange={handleChange}
+              className="w-full mb-2 p-2 border border-gray-300 rounded"
+              required
+            />
+          </>
         )}
 
         {/* Submit button */}
