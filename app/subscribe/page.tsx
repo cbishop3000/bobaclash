@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { useAuth } from "@/app/context/AuthContext";
+import { motion } from 'framer-motion'; // Importing motion for animations
 
 interface SubscriptionInfo {
   title: string;
@@ -12,49 +13,57 @@ interface SubscriptionInfo {
 }
 
 export default function Subscribe() {
-  const { isLoggedIn, user } = useAuth();
+  const { isLoggedIn, user, loading: authLoading } = useAuth();
   const [priceId, setPriceId] = useState<string | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [cancellationLog, setCancellationLog] = useState<any>(null);
 
   useEffect(() => {
     const fetchSubscription = async () => {
-      if (!user?.email) return;
-
-      const res = await fetch('/api/get-subs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: user.email }),
-      });
-
-      const data = await res.json();
-
-      if (data.subscriptionTier) {
-        const tierMapping: { [key: string]: string } = {
-          'CLASHAHOLIC': 'price_1RFjlBHyP3FLprp1stDcSwmc',
-          'I_NEED_COFFEE': 'price_1RFjkhHyP3FLprp1dzlAwJCp',
-          'I_LOVE_COFFEE': 'price_1RFjjOHyP3FLprp1t7p5AOwM',
-          'I_LIKE_COFFEE': 'price_1RFjiLHyP3FLprp1YhkDlNA3',
-        };
-        setPriceId(tierMapping[data.subscriptionTier] || '');
+      if (!user?.email) {
+        setIsLoading(false);
+        return;
       }
-
-      if (user?.id) {
-        const logRes = await fetch('/api/get-cancellation-log', {
+  
+      try {
+        const res = await fetch('/api/get-subs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: user.id }),
+          body: JSON.stringify({ email: user.email }),
         });
-
-        const logData = await logRes.json();
-        console.log(logData)
-        setCancellationLog(logData.cancellationLog);
+  
+        const data = await res.json();
+  
+        if (data.subscriptionTier) {
+          const tierMapping: { [key: string]: string } = {
+            'CLASHAHOLIC': 'price_1RFjlBHyP3FLprp1stDcSwmc',
+            'I_NEED_COFFEE': 'price_1RFjkhHyP3FLprp1dzlAwJCp',
+            'I_LOVE_COFFEE': 'price_1RFjjOHyP3FLprp1t7p5AOwM',
+            'I_LIKE_COFFEE': 'price_1RFjiLHyP3FLprp1YhkDlNA3',
+          };
+          setPriceId(tierMapping[data.subscriptionTier] || '');
+        }
+  
+        if (user?.id) {
+          const logRes = await fetch('/api/get-cancellation-log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.id }),
+          });
+  
+          const logData = await logRes.json();
+          setCancellationLog(logData.cancellationLog);
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setIsLoading(false);
       }
     };
-
+  
     fetchSubscription();
-  }, [user]);
-
+  }, [authLoading, user?.email]);
+  
   const handleCancelSubscription = async () => {
     try {
       if (!user || !user.stripeCustomerId) {
@@ -84,9 +93,6 @@ export default function Subscribe() {
       });
   
       setPriceId(null);
-  
-      alert("Subscription will be canceled at the end of your billing period.");
-  
       // Refresh the page to update all data and UI
       window.location.reload();
   
@@ -166,80 +172,115 @@ export default function Subscribe() {
     const { error } = await stripe.redirectToCheckout({ sessionId: session.id });
     if (error) console.error('Error redirecting to checkout:', error.message);
   };
-  
+
+  if (isLoading || authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-yellow-500"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-4xl font-bold mb-6 text-center">Coffee Subscription</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {subscriptionInfo.map((info, index) => {
-          const isCurrentPlan = priceId === info.stripePriceId;
-          const hasActivePlan = !!priceId;
+  {subscriptionInfo.map((info, index) => {
+    const isCurrentPlan = priceId === info.stripePriceId;
+    const hasActivePlan = !!priceId;
+    const isCancellingCurrentPlan =
+      cancellationLog?.cancellationStatus === 'success' &&
+      priceId === info.stripePriceId;
 
-          const isCancellingCurrentPlan =
-            cancellationLog?.cancellationStatus === 'success' &&
-            priceId === info.stripePriceId;
-
-          return (
-            <div key={index} className="relative">
-              {priceId && cancellationLog?.cancellationStatus === 'success' && priceId !== info.stripePriceId && (
-                <div className="absolute inset-0 bg-yellow-500 bg-opacity-50 rounded-lg z-20 pointer-events-none">
-                  <span className="absolute top-2 right-2 bg-yellow-500 text-white text-xs font-semibold px-2 py-1 rounded-full">
-                    Canceled - Wait until Next Month
-                  </span>
-                </div>
-              )}
-
-              <div className={`relative bg-white shadow-lg rounded-lg p-6 border-4 transition-all duration-300 ${
-                isCurrentPlan
-                  ? 'border-green-500'  // Green for active subscriptions
-                  : 'border-transparent'
-              }`}>
-                {isCurrentPlan && (
-                  <>
-                    <span
-                      className={`absolute top-2 right-2 text-white text-xs font-semibold px-2 py-1 rounded-full ${
-                        isCancellingCurrentPlan ? 'bg-yellow-500' : 'bg-green-500'
-                      }`}
-                    >
-                      {isCancellingCurrentPlan ? 'Plan Being Cancelled' : 'Current Plan'}
-                    </span>
-
-                    {!isCancellingCurrentPlan && (
-                      <button
-                        onClick={handleCancelSubscription}
-                        className="absolute bottom-2 right-2 text-red-600 text-xs font-medium underline z-30 hover:text-red-700"
-                      >
-                        Cancel Subscription
-                      </button>
-                    )}
-                  </>
-                )}
-                <h2 className="text-2xl font-semibold mb-2">{info.title}</h2>
-                <p className="text-gray-700 mb-4 whitespace-pre-line">{info.description}</p>
-                <p className="text-xl font-bold mb-4">${(info.priceCents / 100).toFixed(2)}</p>
-
-                <button
-                  disabled={isCurrentPlan || (hasActivePlan && !isCurrentPlan)}
-                  className={`w-full py-2 px-4 rounded-full text-white ${
-                    isCurrentPlan || (hasActivePlan && !isCurrentPlan)
-                      ? 'bg-gray-400 cursor-not-allowed'
-                      : 'bg-blue-600 hover:bg-blue-700'
-                  }`}
-                  onClick={() => handleSubscription(info.stripePriceId)}
-                >
-                  {isCurrentPlan
-                    ? 'Subscribed'
-                    : hasActivePlan
-                    ? 'You Have an Active Plan'
-                    : 'Subscribe'}
-                </button>
-              </div>
+    return (
+      <motion.div
+        key={index}
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.9 }}
+        transition={{ duration: 0.25 }}
+        className="relative"
+      >
+        {priceId &&
+          cancellationLog?.cancellationStatus === 'success' &&
+          priceId !== info.stripePriceId && (
+            <div className="absolute inset-0 bg-yellow-400/50 rounded-2xl z-20 flex items-start justify-end p-2 pointer-events-none">
+              <span className="bg-yellow-600 text-white text-xs font-semibold px-3 py-1 rounded-full shadow">
+                Canceled - Wait until Next Month
+              </span>
             </div>
-          );
-        })}
-      </div>
+          )}
+
+        <motion.div
+          className={`group h-80 bg-white rounded-2xl shadow-xl border-4 p-6 transition-all duration-300 relative overflow-hidden ${
+            isCurrentPlan ? 'border-green-500' : 'border-gray-200'
+          }`}
+          whileHover={{ scale: 1.03 }}
+          whileTap={{ scale: 0.97 }}
+        >
+          {isCurrentPlan && (
+            <>
+              <span
+                className={`absolute top-3 right-3 text-white text-xs font-semibold px-3 py-1 rounded-full shadow ${
+                  isCancellingCurrentPlan ? 'bg-yellow-500' : 'bg-green-500'
+                }`}
+              >
+                {isCancellingCurrentPlan ? 'Plan Being Cancelled' : 'Current Plan'}
+              </span>
+
+              {!isCancellingCurrentPlan && (
+                <button
+                  onClick={handleCancelSubscription}
+                  className="absolute bottom-3 right-3 text-red-600 text-sm underline hover:text-red-700 z-30"
+                >
+                  Cancel Subscription
+                </button>
+              )}
+            </>
+          )}
+
+          <motion.h2
+            className="text-xl font-bold mb-2 text-gray-900"
+            initial={{ x: -10 }}
+            animate={{ x: 0 }}
+            transition={{ duration: 0.25 }}
+          >
+            {info.title}
+          </motion.h2>
+          <motion.p
+            className="text-gray-600 mb-4 whitespace-pre-line text-sm"
+            initial={{ y: 10 }}
+            animate={{ y: 0 }}
+            transition={{ duration: 0.25 }}
+          >
+            {info.description}
+          </motion.p>
+          <p className="text-2xl font-semibold text-gray-900 mb-6">
+            ${(info.priceCents / 100).toFixed(2)}
+          </p>
+
+          <button
+            disabled={isCurrentPlan || (hasActivePlan && !isCurrentPlan)}
+            className={`w-full py-2 px-4 rounded-full font-medium text-white transition-colors duration-200 ${
+              isCurrentPlan || (hasActivePlan && !isCurrentPlan)
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700'
+            }`}
+            onClick={() => handleSubscription(info.stripePriceId)}
+          >
+            {isCurrentPlan
+              ? 'Subscribed'
+              : hasActivePlan
+              ? 'You Have an Active Plan'
+              : 'Subscribe'}
+          </button>
+        </motion.div>
+      </motion.div>
+    );
+  })}
+</div>
+
     </div>
   );
 }

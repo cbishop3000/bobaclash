@@ -35,13 +35,6 @@ export default function Navbar() {
     <Disclosure as="nav" className="bg-amber-50">
       <div className="mx-auto max-w-7xl px-2 sm:px-6 lg:px-8">
         <div className="relative flex h-16 items-center justify-between">
-          {/* Mobile menu button */}
-          <div className="absolute inset-y-0 left-0 flex items-center sm:hidden">
-            <DisclosureButton>
-              <span className="sr-only">Open main menu</span>
-              <Bars3Icon className="h-6 w-6" aria-hidden="true" />
-            </DisclosureButton>
-          </div>
 
           {/* Logo and Navigation Links */}
           <div className="flex flex-1 items-center justify-center sm:items-stretch sm:justify-start">
@@ -50,20 +43,26 @@ export default function Navbar() {
                 <img alt="Your Company" src={Logo} className="h-8 w-auto" />
               </Link>
             </div>
-            <div className="hidden sm:ml-6 sm:block">
-              <div className="flex space-x-4">
-                {isAdmin && (
-                  <Link href="/admin" className="text-gray-900">Dashboard</Link> // Only show if user is admin
-                )}
-                {navigation.map((item) => (
-                  <Link key={item.name} href={item.href} className="text-gray-900">
-                    {item.name}
-                  </Link>
-                ))}
-              </div>
+            <div className="m-2">
+              {isAdmin && (
+                <Link
+                  href="/admin"
+                  className="text-amber-900 font-semibold px-3 py-2 rounded-lg hover:bg-amber-100 transition duration-200"
+                >
+                  Dashboard
+                </Link>
+              )}
+              {navigation.map((item) => (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className="text-amber-900 font-semibold px-3 py-2 rounded-lg hover:bg-amber-100 transition duration-200"
+                >
+                  {item.name}
+                </Link>
+              ))}
             </div>
           </div>
-
           {/* Auth Buttons */}
           <div className="flex items-center space-x-2">
             {isLoggedIn ? (

@@ -10,10 +10,11 @@ interface User {
 
 interface AuthContextType {
   isLoggedIn: boolean;
-  isAdmin: boolean; // Easily check if user is an admin
+  isAdmin: boolean;
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  loading: boolean; // ✅ Add this
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,20 +35,23 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
   const isLoggedIn = Boolean(user);
   const isAdmin = user?.role === 'ADMIN'; // Check if the user is an admin
+  const [loading, setLoading] = useState(true); // ← Add this
 
   const fetchUser = async () => {
     try {
       const res = await fetch('/api/me');
       if (res.ok) {
         const data = await res.json();
-        setUser(data.user); // Assuming backend sends user object with stripeCustomerId
+        setUser(data.user);
       } else {
         setUser(null);
       }
     } catch (err) {
       setUser(null);
+    } finally {
+      setLoading(false); // ✅ Important! Mark loading as done
     }
-  };
+  };  
 
   useEffect(() => {
     fetchUser(); // Fetch user data on initial load
@@ -74,7 +78,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   return (
-    <AuthContext.Provider value={{ isLoggedIn, isAdmin, user, login, logout }}>
+    <AuthContext.Provider value={{ isLoggedIn, isAdmin, user, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );
