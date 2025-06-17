@@ -6,6 +6,8 @@ import Navbar from "./components/navbar";
 import { ModalProvider } from "./context/ModalContext"; 
 import { AuthProvider } from "./context/AuthContext";   
 import AuthModal from "./components/AuthModal";
+import Footer from "./components/Footer";
+
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,10 +32,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}>
-        <AuthProvider> {/* 🛡️ Wrap the whole app in AuthProvider FIRST */}
-          <ModalProvider> {/* ModalProvider goes INSIDE AuthProvider */}
+        <AuthProvider>
+          <ModalProvider>
             <Navbar />
             <main className="flex-grow">{children}</main>
+            <Footer /> {/* ✅ Now global across all pages */}
             <AuthModal />
           </ModalProvider>
         </AuthProvider>
@@ -41,3 +44,4 @@ export default function RootLayout({
     </html>
   );
 }
+

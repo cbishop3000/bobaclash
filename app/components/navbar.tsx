@@ -7,11 +7,16 @@ import { useAuth } from '../context/AuthContext'; // Use AuthContext here
 import { useModal } from '../context/ModalContext';
 import AuthModal from './AuthModal';
 
-const Logo = './logo.png'; // Ensure this path to your logo is correct
+const Logo = './clash.avif'; // Ensure this path to your logo is correct
 
 const navigation = [
+  { name: 'About', href: '/about' },
+  { name: 'Order Online', href: 'https://order.rezku.com/Clash' },
+  { name: 'Gift Card', href: '/gift-card' },
+  { name: 'Socials', href: '/socials' },
+  { name: 'FAQs', href: '/faqs' },
+  { name: 'Contact', href: '/contact' },
   { name: 'Subscriptions', href: '/subscribe' },
-  { name: 'Order', href: 'https://order.rezku.com/Clash' },
 ];
 
 export default function Navbar() {
@@ -32,7 +37,7 @@ export default function Navbar() {
   };
 
   return (
-    <Disclosure as="nav" className="bg-amber-50">
+    <Disclosure as="nav" className="bg-stone-400">
       <div className="mx-auto max-w-7xl px-2 sm:px-6 lg:px-8">
         <div className="relative flex h-16 items-center justify-between">
 
@@ -40,7 +45,7 @@ export default function Navbar() {
           <div className="flex flex-1 items-center justify-center sm:items-stretch sm:justify-start">
             <div className="flex shrink-0 items-center">
               <Link href="/">
-                <img alt="Your Company" src={Logo} className="h-8 w-auto" />
+                <img alt="Your Company" src={Logo} className="h-16 w-auto" />
               </Link>
             </div>
             <div className="m-2">
@@ -56,7 +61,7 @@ export default function Navbar() {
                 <Link
                   key={item.name}
                   href={item.href}
-                  className="text-amber-900 font-semibold px-3 py-2 rounded-lg hover:bg-amber-100 transition duration-200"
+                  className="text-stone-50 font-semibold px-3 py-2 rounded-lg hover:bg-amber-100 transition duration-200"
                 >
                   {item.name}
                 </Link>
