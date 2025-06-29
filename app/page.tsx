@@ -25,44 +25,57 @@ export default function Home() {
     <main className="flex flex-col min-h-screen bg-gray-900 text-white">
       
       {/* Welcome Section */}
-      <section className="relative w-full h-screen overflow-hidden bg-black">
-        {/* Parallax Background */}
-        <div>
-          <div
-            className="absolute inset-0 bg-cover bg-center"
-            style={{
-              backgroundImage: 'url("/mainimg.avif")', // Image in the public folder
-              transform: `translateY(${scrollY * 0.3}px)`, // This creates the parallax scroll effect
-              height: '100%',
-              width: '50%'
-            }}
+      <section className="relative w-full overflow-hidden bg-black">
+  {/* Welcome Section - This will take up the full screen height first */}
+  <div className="relative h-screen flex flex-col items-center justify-center text-center">
+    <div className="relative z-20 px-6 py-8">
+      <h1 className="text-4xl md:text-6xl font-bold leading-tight text-white">
+        Welcome to Clash Fam Coffee
+      </h1>
+      <p className="mt-4 text-lg md:text-xl m-2 text-gray-300">
+        The best coffee, delivered straight to your door every month.
+      </p>
+    </div>
+  </div>
+
+  {/* More Than Just Coffee Section - This will appear *after* the welcome section, also taking full screen height */}
+  <div className="relative h-screen flex items-center justify-center p-2">
+    {/* Left: Image */}
+    <div className="w-1/2 h-full flex items-center justify-center">
+      <img
+        src="/mainimg.avif"
+        alt="Clash Fam Coffee"
+        className="object-cover h-full w-full rounded-xl"
+      />
+    </div>
+
+    {/* Right: Text Section */}
+    <div className="w-1/2 h-full p-2">
+      <div
+        className="flex rounded-xl overflow-hidden h-full"
+        style={{ backgroundColor: "#f0ede9", color: "#000" }}
+      >
+        <div className="w-full p-8 flex flex-col justify-center">
+          <h2
+            className="text-3xl font-bold mb-4"
+            style={{ fontFamily: "Conneqt Black", color: "#e26c0c" }}
           >
-            
-          </div>
-          <div
-            className="absolute inset-0 bg-cover bg-center"
-            style={{
-              transform: `translateY(${scrollY * 0.3}px)`, // This creates the parallax scroll effect
-              height: '100%',
-              width: '50%'
-            }}
+            ALL NATURAL
+          </h2>
+          <p
+            className="text-lg leading-relaxed"
+            style={{ fontFamily: "Avenir Next LT Pro Thin" }}
           >
-            
-          </div>
+            At Clash, we believe community is brewed one cup at a time. We're more than a
+            trailer — we're a mobile gathering space fueled by culture, creativity, and
+            flavor. Whether you're catching up with a friend or finding your moment of
+            peace in the chaos, Clash is your sanctuary.
+          </p>
         </div>
-      
-        {/* Main Content */}
-        <div className="relative z-10 flex flex-col items-center justify-center text-center h-full">
-          <div className="relative z-20 px-6 py-8">
-            <h1 className="text-4xl md:text-6xl font-bold leading-tight text-white">
-              Welcome to Clash Fam Coffee
-            </h1>
-            <p className="mt-4 text-lg md:text-xl m-2 text-gray-300">
-              The best coffee, delivered straight to your door every month.
-            </p>
-          </div>
-        </div>
-      </section>
+      </div>
+    </div>
+  </div>
+</section>
       <section>
         <Map />
       </section>

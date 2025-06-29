@@ -15,7 +15,6 @@ const navigation = [
   { name: 'Gift Card', href: '/giftcard' },
   { name: 'Socials', href: '/socials' },
   { name: 'FAQs', href: '/faqs' },
-  { name: 'Contact', href: '/contact' },
   { name: 'Subscriptions', href: '/subscribe' },
 ];
 
@@ -48,7 +47,7 @@ export default function Navbar() {
                 <img alt="Your Company" src={Logo} className="h-16 w-auto" />
               </Link>
             </div>
-            <div className="m-2">
+            <div className="m-2 pt-3">
               {isAdmin && (
                 <Link
                   href="/admin"
