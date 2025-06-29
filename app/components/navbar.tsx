@@ -12,7 +12,7 @@ const Logo = './clash.avif'; // Ensure this path to your logo is correct
 const navigation = [
   { name: 'About', href: '/about' },
   { name: 'Order Online', href: 'https://order.rezku.com/Clash' },
-  { name: 'Gift Card', href: '/gift-card' },
+  { name: 'Gift Card', href: '/giftcard' },
   { name: 'Socials', href: '/socials' },
   { name: 'FAQs', href: '/faqs' },
   { name: 'Contact', href: '/contact' },

@@ -144,156 +144,156 @@ const AuthModal = ({ defaultMode = "login" }: AuthModalProps) => {
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-      <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full">
-        <h2 className="text-xl font-semibold mb-4">
-          {isLogin ? "Login" : "Sign Up"}
-        </h2>
+  <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full overflow-y-auto max-h-[60vh]">
+    <h2 className="text-xl font-semibold mb-4">
+      {isLogin ? "Login" : "Sign Up"}
+    </h2>
 
-        {/* Error message */}
-        {errorMessage && (
-          <p className="text-red-500 text-sm mb-4">{errorMessage}</p>
-        )}
+    {/* Error message */}
+    {errorMessage && (
+      <p className="text-red-500 text-sm mb-4">{errorMessage}</p>
+    )}
 
-        {/* Name input (only shown during sign up) */}
-        {!isLogin && (
-          <input
-            type="text"
-            name="name"
-            placeholder="Name"
-            value={form.name}
-            onChange={handleChange}
-            className="w-full mb-2 p-2 border border-gray-300 rounded"
-          />
-        )}
+    {/* Name input (only shown during sign up) */}
+    {!isLogin && (
+      <input
+        type="text"
+        name="name"
+        placeholder="Name"
+        value={form.name}
+        onChange={handleChange}
+        className="w-full mb-2 p-2 border border-gray-300 rounded"
+      />
+    )}
 
-        {/* Email input */}
+    {/* Email input */}
+    <input
+      type="email"
+      name="email"
+      placeholder="Email"
+      value={form.email}
+      onChange={handleChange}
+      className="w-full mb-2 p-2 border border-gray-300 rounded"
+    />
+
+    {/* Password input */}
+    <input
+      type="password"
+      name="password"
+      placeholder="Password"
+      value={form.password}
+      onChange={handleChange}
+      className="w-full mb-2 p-2 border border-gray-300 rounded"
+    />
+
+    {/* Confirm password (only shown during sign up) */}
+    {!isLogin && (
+      <input
+        type="password"
+        name="confirmPassword"
+        placeholder="Confirm Password"
+        value={form.confirmPassword}
+        onChange={handleChange}
+        className="w-full mb-2 p-2 border border-gray-300 rounded"
+      />
+    )}
+
+    {/* Address fields (only shown during sign up) */}
+    {!isLogin && (
+      <>
         <input
-          type="email"
-          name="email"
-          placeholder="Email"
-          value={form.email}
+          type="text"
+          name="addressStreet"
+          placeholder="Street Address (required)"
+          value={form.addressStreet}
+          onChange={handleChange}
+          className="w-full mb-2 p-2 border border-gray-300 rounded"
+          required
+        />
+        <input
+          type="text"
+          name="addressUnit"
+          placeholder="Apartment/Unit (optional)"
+          value={form.addressUnit}
           onChange={handleChange}
           className="w-full mb-2 p-2 border border-gray-300 rounded"
         />
-
-        {/* Password input */}
         <input
-          type="password"
-          name="password"
-          placeholder="Password"
-          value={form.password}
+          type="text"
+          name="city"
+          placeholder="City (required)"
+          value={form.city}
           onChange={handleChange}
           className="w-full mb-2 p-2 border border-gray-300 rounded"
+          required
         />
+        <input
+          type="text"
+          name="state"
+          placeholder="State (required)"
+          value={form.state}
+          onChange={handleChange}
+          className="w-full mb-2 p-2 border border-gray-300 rounded"
+          required
+        />
+        <input
+          type="text"
+          name="zip"
+          placeholder="ZIP Code (required)"
+          value={form.zip}
+          onChange={handleChange}
+          className="w-full mb-2 p-2 border border-gray-300 rounded"
+          required
+        />
+        <input
+          type="text"
+          name="phone"
+          placeholder="Phone Number (required)"
+          value={form.phone}
+          onChange={handleChange}
+          className="w-full mb-2 p-2 border border-gray-300 rounded"
+          required
+        />
+      </>
+    )}
 
-        {/* Confirm password (only shown during sign up) */}
-        {!isLogin && (
-          <input
-            type="password"
-            name="confirmPassword"
-            placeholder="Confirm Password"
-            value={form.confirmPassword}
-            onChange={handleChange}
-            className="w-full mb-2 p-2 border border-gray-300 rounded"
-          />
-        )}
+    {/* Submit button */}
+    <button
+      onClick={isLogin ? handleLogin : handleSignup}
+      className="w-full bg-amber-900 text-white py-2 rounded hover:bg-amber-100 mt-2"
+      disabled={loading}
+    >
+      {loading
+        ? isLogin
+          ? "Logging In..."
+          : "Signing Up..."
+        : isLogin
+          ? "Login"
+          : "Sign Up"}
+    </button>
 
-        {/* Address fields (only shown during sign up) */}
-        {!isLogin && (
-          <>
-            <input
-              type="text"
-              name="addressStreet"
-              placeholder="Street Address (required)"
-              value={form.addressStreet}
-              onChange={handleChange}
-              className="w-full mb-2 p-2 border border-gray-300 rounded"
-              required
-            />
-            <input
-              type="text"
-              name="addressUnit"
-              placeholder="Apartment/Unit (optional)"
-              value={form.addressUnit}
-              onChange={handleChange}
-              className="w-full mb-2 p-2 border border-gray-300 rounded"
-            />
-            <input
-              type="text"
-              name="city"
-              placeholder="City (required)"
-              value={form.city}
-              onChange={handleChange}
-              className="w-full mb-2 p-2 border border-gray-300 rounded"
-              required
-            />
-            <input
-              type="text"
-              name="state"
-              placeholder="State (required)"
-              value={form.state}
-              onChange={handleChange}
-              className="w-full mb-2 p-2 border border-gray-300 rounded"
-              required
-            />
-            <input
-              type="text"
-              name="zip"
-              placeholder="ZIP Code (required)"
-              value={form.zip}
-              onChange={handleChange}
-              className="w-full mb-2 p-2 border border-gray-300 rounded"
-              required
-            />
-            <input
-              type="text"
-              name="phone"
-              placeholder="Phone Number (required)"
-              value={form.phone}
-              onChange={handleChange}
-              className="w-full mb-2 p-2 border border-gray-300 rounded"
-              required
-            />
-          </>
-        )}
+    {/* Close button */}
+    <button
+      onClick={closeModal}
+      className="w-full mt-2 text-gray-500 text-sm"
+    >
+      Close
+    </button>
 
-        {/* Submit button */}
+    {/* Toggle between Login/Signup */}
+    <div className="mt-2 text-center text-sm">
+      <span>
+        {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
         <button
-          onClick={isLogin ? handleLogin : handleSignup}
-          className="w-full bg-amber-900 text-white py-2 rounded hover:bg-amber-100 mt-2"
-          disabled={loading}
+          onClick={() => setModalType(isLogin ? "signup" : "login")}
+          className="text-blue-500 underline"
         >
-          {loading
-            ? isLogin
-              ? "Logging In..."
-              : "Signing Up..."
-            : isLogin
-            ? "Login"
-            : "Sign Up"}
+          {isLogin ? "Sign up" : "Log in"}
         </button>
-
-        {/* Close button */}
-        <button
-          onClick={closeModal}
-          className="w-full mt-2 text-gray-500 text-sm"
-        >
-          Close
-        </button>
-
-        {/* Toggle between Login/Signup */}
-        <div className="mt-2 text-center text-sm">
-          <span>
-            {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
-            <button
-              onClick={() => setModalType(isLogin ? "signup" : "login")}
-              className="text-blue-500 underline"
-            >
-              {isLogin ? "Sign up" : "Log in"}
-            </button>
-          </span>
-        </div>
-      </div>
+      </span>
     </div>
+  </div>
+</div>
   );
 };
 
