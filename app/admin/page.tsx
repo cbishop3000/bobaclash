@@ -1,85 +1,161 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
+import { toast } from 'react-hot-toast';
+
+// Types
+interface DeliveryLog {
+  id: string;
+  userId: string;
+  shippedAt: string;
+  items: string;
+}
+
+interface SubscriptionUser {
+  id: string;
+  email: string;
+  role: string;
+  stripeCustomerId?: string;
+  subscriptionTier?: string;
+  isNewSubscriber: boolean;
+  merchSent: boolean;
+  addressFormatted?: string;
+  createdAt: string;
+  updatedAt: string;
+  deliveries: DeliveryLog[];
+}
+
+interface DeliveryFormData {
+  userId: string;
+  items: string;
+  shippedAt: string;
+}
+
+// Constants
+const RECENT_DELIVERY_DAYS = 30;
+const UPCOMING_DELIVERY_WARNING_DAYS = 7;
 
 export default function AdminDashboard() {
-  const { user, isLoggedIn } = useAuth();
+  const { user, isLoggedIn, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [isChecking, setIsChecking] = useState(true);
-  const [users, setUsers] = useState<any[]>([]);
+
+  // State
+  const [users, setUsers] = useState<SubscriptionUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [selectedUser, setSelectedUser] = useState<SubscriptionUser | null>(null);
   const [itemsShipped, setItemsShipped] = useState('');
-  const [openUserDeliveries, setOpenUserDeliveries] = useState<{ [key: string]: boolean }>({});
+  const [openUserDeliveries, setOpenUserDeliveries] = useState<Record<string, boolean>>({});
+  const [savingDelivery, setSavingDelivery] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  // Authentication and data fetching
   useEffect(() => {
-    if (!isLoggedIn) {
+    if (authLoading) return;
+
+    if (!isLoggedIn || user?.role !== 'ADMIN') {
       router.push('/');
-    } else if (user?.role !== 'ADMIN') {
-      router.push('/');
-    } else {
-      setIsChecking(false);
+      return;
     }
 
-    const fetchSubscribedUsers = async () => {
-      try {
-        const response = await fetch('/api/get-subscriptions');
-        const data = await response.json();
-
-        if (Array.isArray(data)) {
-          setUsers(data);
-        } else {
-          console.error('Error: Received data is not an array');
-        }
-      } catch (error) {
-        console.error('Error fetching subscribed users:', error);
-      } finally {
-        setLoadingUsers(false);
-      }
-    };
-
     fetchSubscribedUsers();
-  }, [isLoggedIn, user, router]);
+  }, [isLoggedIn, user, router, authLoading]);
 
-  const filteredUsers = users.filter((user) => {
+  const fetchSubscribedUsers = useCallback(async () => {
+    try {
+      setError(null);
+      const response = await fetch('/api/get-subscriptions');
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch users: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      if (Array.isArray(data)) {
+        setUsers(data);
+      } else {
+        throw new Error('Invalid data format received');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch users';
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setLoadingUsers(false);
+    }
+  }, []);
+
+  // Memoized filtered users for performance
+  const filteredUsers = useMemo(() => {
+    if (!searchTerm.trim()) return users;
+
     const lower = searchTerm.toLowerCase();
-    return (
+    return users.filter((user) => (
       user.email.toLowerCase().includes(lower) ||
       user.role.toLowerCase().includes(lower) ||
       (user.stripeCustomerId && user.stripeCustomerId.toLowerCase().includes(lower)) ||
       (user.subscriptionTier && user.subscriptionTier.toLowerCase().includes(lower)) ||
-      (user.address && user.address.toLowerCase().includes(lower))
-    );
-  });
+      (user.addressFormatted && user.addressFormatted.toLowerCase().includes(lower))
+    ));
+  }, [users, searchTerm]);
 
-  const handleFilled = (userId: string) => {
+  // Utility functions
+  const hasRecentDelivery = useCallback((user: SubscriptionUser): boolean => {
+    if (!user.deliveries?.length) return false;
+
+    const lastDelivery = new Date(user.deliveries[user.deliveries.length - 1].shippedAt);
+    const daysSinceLastDelivery = Math.floor((Date.now() - lastDelivery.getTime()) / (1000 * 60 * 60 * 24));
+
+    return daysSinceLastDelivery <= RECENT_DELIVERY_DAYS;
+  }, []);
+
+  const isUpcomingDeliveryDue = useCallback((user: SubscriptionUser): boolean => {
+    if (!user.deliveries?.length) return false;
+
+    const lastDelivery = new Date(user.deliveries[user.deliveries.length - 1].shippedAt);
+    const nextDeliveryDue = new Date(lastDelivery);
+    nextDeliveryDue.setMonth(lastDelivery.getMonth() + 1);
+
+    const daysUntilDue = Math.ceil((nextDeliveryDue.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+
+    return daysUntilDue <= UPCOMING_DELIVERY_WARNING_DAYS && daysUntilDue > 0;
+  }, []);
+
+  // Event handlers
+  const handleFilled = useCallback((userId: string) => {
     const user = users.find((u) => u.id === userId);
     if (user) {
       setSelectedUser(user);
       setIsModalOpen(true);
+      setItemsShipped(''); // Reset form
     }
-  };
+  }, [users]);
 
-  const handleCloseModal = () => {
+  const handleCloseModal = useCallback(() => {
     setIsModalOpen(false);
-  };
+    setSelectedUser(null);
+    setItemsShipped('');
+  }, []);
 
-  const handleSaveDelivery = async () => {
-    if (!itemsShipped) {
-      alert('Please provide a description of the items shipped.');
+  const handleSaveDelivery = useCallback(async () => {
+    if (!selectedUser) return;
+
+    if (!itemsShipped.trim()) {
+      toast.error('Please provide a description of the items shipped.');
       return;
     }
 
-    const deliveryData = {
+    const deliveryData: DeliveryFormData = {
       userId: selectedUser.id,
-      items: itemsShipped,
-      shippedAt: new Date().toISOString(), // This returns a string
+      items: itemsShipped.trim(),
+      shippedAt: new Date().toISOString(),
     };
-  
+
+    setSavingDelivery(true);
 
     try {
       const response = await fetch('/api/save-delivery', {
@@ -90,137 +166,260 @@ export default function AdminDashboard() {
         },
       });
 
-      if (response.ok) {
-        setIsModalOpen(false);
-      } else {
-        alert('Failed to save delivery log');
+      if (!response.ok) {
+        throw new Error(`Failed to save delivery: ${response.statusText}`);
       }
-    } catch (error) {
-      console.error('Error saving delivery log:', error);
-      alert('Error saving delivery log');
-    }
-  };
 
-  const toggleDeliveryLogs = (userId: string) => {
+      // Optimistically update the UI
+      setUsers(prevUsers =>
+        prevUsers.map(user =>
+          user.id === selectedUser.id
+            ? {
+                ...user,
+                deliveries: [
+                  ...user.deliveries,
+                  {
+                    id: `temp-${Date.now()}`, // Temporary ID
+                    userId: selectedUser.id,
+                    shippedAt: deliveryData.shippedAt,
+                    items: deliveryData.items,
+                  }
+                ]
+              }
+            : user
+        )
+      );
+
+      toast.success('Delivery logged successfully!');
+      handleCloseModal();
+
+      // Refresh data to get the real ID from server
+      fetchSubscribedUsers();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save delivery log';
+      toast.error(errorMessage);
+    } finally {
+      setSavingDelivery(false);
+    }
+  }, [selectedUser, itemsShipped, handleCloseModal, fetchSubscribedUsers]);
+
+  const toggleDeliveryLogs = useCallback((userId: string) => {
     setOpenUserDeliveries((prevState) => ({
       ...prevState,
       [userId]: !prevState[userId],
     }));
-  };
+  }, []);
 
-  const checkIfNewMonthApproaching = (subscriptionDate: string) => {
-    const now = new Date();
-    const subscriptionDateObj = new Date(subscriptionDate);
-    const nextMonth = new Date(subscriptionDateObj);
-    nextMonth.setMonth(subscriptionDateObj.getMonth() + 1);
+  // Statistics - moved before conditional returns to follow Rules of Hooks
+  const stats = useMemo(() => {
+    const totalUsers = users.length;
+    const usersWithRecentDeliveries = users.filter(hasRecentDelivery).length;
+    const usersDueForDelivery = users.filter(isUpcomingDeliveryDue).length;
+    const newSubscribers = users.filter(user => user.isNewSubscriber).length;
+    const totalDeliveries = users.reduce((sum, user) => sum + (user.deliveries?.length || 0), 0);
 
-    const diffTime = nextMonth.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return {
+      totalUsers,
+      usersWithRecentDeliveries,
+      usersDueForDelivery,
+      newSubscribers,
+      totalDeliveries,
+    };
+  }, [users, hasRecentDelivery, isUpcomingDeliveryDue]);
 
-    return diffDays <= 7 && diffDays > 0; // Within a week of the next subscription month
-  };
-
-  if (isChecking) {
-    return <div className="p-4 text-gray-500">Checking admin access...</div>;
+  // Loading states
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-gray-500">Checking authentication...</div>
+      </div>
+    );
   }
 
   if (loadingUsers) {
-    return <div className="p-4 text-gray-500">Loading users...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-gray-500">Loading users...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="text-red-500 mb-4">Error: {error}</div>
+          <button
+            onClick={fetchSubscribedUsers}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <main className="p-8">
-      <h1 className="text-3xl font-bold mb-4">Admin Dashboard</h1>
+    <main className="p-8 max-w-7xl mx-auto">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
+        <p className="text-gray-600">Manage subscriber accounts and track deliveries</p>
+      </div>
+
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+        <div className="bg-white p-4 rounded-lg shadow border">
+          <div className="text-2xl font-bold text-blue-600">{stats.totalUsers}</div>
+          <div className="text-sm text-gray-600">Total Subscribers</div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow border">
+          <div className="text-2xl font-bold text-green-600">{stats.usersWithRecentDeliveries}</div>
+          <div className="text-sm text-gray-600">Recent Deliveries</div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow border">
+          <div className="text-2xl font-bold text-yellow-600">{stats.usersDueForDelivery}</div>
+          <div className="text-sm text-gray-600">Due for Delivery</div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow border">
+          <div className="text-2xl font-bold text-purple-600">{stats.newSubscribers}</div>
+          <div className="text-sm text-gray-600">New Subscribers</div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow border">
+          <div className="text-2xl font-bold text-indigo-600">{stats.totalDeliveries}</div>
+          <div className="text-sm text-gray-600">Total Deliveries</div>
+        </div>
+      </div>
 
       {/* Legend */}
-      <div className="mb-4 text-sm text-gray-600">
-        <span className="inline-block w-3 h-3 bg-green-500 rounded-full mr-1"></span> Delivery in last 30 days
-        <span className="inline-block w-3 h-3 bg-red-500 rounded-full ml-4 mr-1"></span> No recent delivery
+      <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+        <h3 className="text-sm font-medium text-gray-700 mb-2">Status Legend:</h3>
+        <div className="flex flex-wrap gap-4 text-sm text-gray-600">
+          <div className="flex items-center">
+            <span className="inline-block w-3 h-3 bg-green-500 rounded-full mr-2"></span>
+            Has delivery history
+          </div>
+          <div className="flex items-center">
+            <span className="inline-block w-3 h-3 bg-red-500 rounded-full mr-2"></span>
+            No deliveries yet
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1">
         <section className="bg-white shadow rounded-xl p-6">
-          <h2 className="text-xl font-semibold mb-2">User Management</h2>
-          <p className="text-gray-600">Assign roles and manage deliveries.</p>
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h2 className="text-xl font-semibold">Subscriber Management</h2>
+              <p className="text-gray-600">Manage deliveries and track subscriber status</p>
+            </div>
+            <button
+              onClick={fetchSubscribedUsers}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+              disabled={loadingUsers}
+            >
+              {loadingUsers ? 'Refreshing...' : 'Refresh'}
+            </button>
+          </div>
 
-          <div className="mb-4">
-            <input
-              type="text"
-              placeholder="Search users..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-md"
-            />
+          <div className="mb-6 space-y-4">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search by email, role, tier, or address..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+            </div>
+
+            {searchTerm && (
+              <div className="text-sm text-gray-600">
+                Showing {filteredUsers.length} of {users.length} subscribers
+              </div>
+            )}
           </div>
 
           <div className="h-[400px] overflow-y-auto">
             <ul>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {filteredUsers.length === 0 ? (
-                  <li className="p-4 text-gray-500">No users found</li>
+                  <li className="p-4 text-gray-500">
+                    {searchTerm ? `No users found matching "${searchTerm}"` : 'No subscribed users found'}
+                  </li>
                 ) : (
                   filteredUsers.map((user) => {
-                    const now = new Date();
-                    const lastDelivery = user.deliveries?.length
-                      ? new Date(user.deliveries[user.deliveries.length - 1].shippedAt)
-                      : null;
+                    const hasAnyDeliveries = user.deliveries && user.deliveries.length > 0;
 
-                    const isNewMonthApproaching =
-                      lastDelivery && checkIfNewMonthApproaching(lastDelivery.toISOString()); // Convert to string
-
-                    const hasRecentDelivery = user.deliveries?.length > 0;
-
-                    const userCardClass = `border-l-4 pb-4 pl-4 rounded ${
-                      hasRecentDelivery
+                    const userCardClass = `border-l-4 pb-4 pl-4 rounded transition-colors ${
+                      hasAnyDeliveries
                         ? 'border-green-500 bg-green-50'
-                        : isNewMonthApproaching
-                        ? 'border-yellow-500 bg-yellow-50'
                         : 'border-red-500 bg-red-50'
                     }`;
 
                     return (
                       <div key={user.id} className={userCardClass}>
-                        <h3 className="font-bold text-lg truncate">{user.email}</h3>
-                        <p className="text-sm"><strong>Role:</strong> {user.role}</p>
-                        {user.stripeCustomerId && <p className="text-sm"><strong>Stripe ID:</strong> {user.stripeCustomerId}</p>}
-                        {user.subscriptionTier && <p className="text-sm"><strong>Tier:</strong> {user.subscriptionTier}</p>}
-                        <p className="text-sm"><strong>New:</strong> {user.isNewSubscriber ? 'Yes' : 'No'}</p>
-                        <p className="text-sm"><strong>Merch:</strong> {user.merchSent ? 'Yes' : 'No'}</p>
-                        {user.address && <p className="text-sm"><strong>Address:</strong> {user.address}</p>}
-                        <p className="text-sm"><strong>Deliveries:</strong> {user.deliveries?.length || 0}</p>
+                        <h3 className="font-bold text-lg truncate" title={user.email}>
+                          {user.email}
+                        </h3>
+                        <div className="space-y-1 text-sm">
+                          <p><strong>Role:</strong> {user.role}</p>
+                          {user.stripeCustomerId && (
+                            <p><strong>Stripe ID:</strong> {user.stripeCustomerId}</p>
+                          )}
+                          {user.subscriptionTier && (
+                            <p><strong>Tier:</strong> {user.subscriptionTier}</p>
+                          )}
+                          <p><strong>New:</strong> {user.isNewSubscriber ? 'Yes' : 'No'}</p>
+                          <p><strong>Merch:</strong> {user.merchSent ? 'Yes' : 'No'}</p>
+                          {user.addressFormatted && (
+                            <p><strong>Address:</strong> {user.addressFormatted}</p>
+                          )}
+                          <p><strong>Deliveries:</strong> {user.deliveries?.length || 0}</p>
+                        </div>
 
                         {/* Timestamps */}
-                        <p className="text-xs text-gray-500">Created: {new Date(user.createdAt).toLocaleString()}</p>
-                        <p className="text-xs text-gray-500">Updated: {new Date(user.updatedAt).toLocaleString()}</p>
+                        <div className="mt-2 space-y-1 text-xs text-gray-500">
+                          <p>Created: {new Date(user.createdAt).toLocaleString()}</p>
+                          <p>Updated: {new Date(user.updatedAt).toLocaleString()}</p>
+                        </div>
 
-                        {/* Filled Button */}
-                        <button
-                          className="mt-2 px-4 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs"
-                          onClick={() => handleFilled(user.id)}
-                        >
-                          Filled
-                        </button>
+                        {/* Action Buttons */}
+                        <div className="mt-3 space-x-2">
+                          <button
+                            className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs transition-colors"
+                            onClick={() => handleFilled(user.id)}
+                          >
+                            Log Delivery
+                          </button>
 
-                        {/* Delivery Log Button */}
-                        <button
-                          className="mt-2 px-4 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs"
-                          onClick={() => toggleDeliveryLogs(user.id)}
-                        >
-                          {openUserDeliveries[user.id] ? 'Hide Deliveries' : 'Show Deliveries'}
-                        </button>
+                          <button
+                            className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs transition-colors"
+                            onClick={() => toggleDeliveryLogs(user.id)}
+                          >
+                            {openUserDeliveries[user.id] ? 'Hide' : 'Show'} Deliveries
+                          </button>
+                        </div>
 
-                        {/* Show Deliveries if toggled */}
-                        {openUserDeliveries[user.id] && user.deliveries && (
-                          <div className="mt-4">
-                            <h4 className="text-sm font-semibold">Delivery Logs</h4>
-                            <ul>
-                              {user.deliveries.map((delivery: any) => (
-                                <li key={delivery.id} className="mb-4 p-4 border-b text-xs">
-                                  <p><strong>Shipped At:</strong> {new Date(delivery.shippedAt).toLocaleString()}</p>
+                        {/* Delivery Logs */}
+                        {openUserDeliveries[user.id] && user.deliveries?.length > 0 && (
+                          <div className="mt-4 border-t pt-3">
+                            <h4 className="text-sm font-semibold mb-2">Delivery History</h4>
+                            <div className="space-y-2 max-h-40 overflow-y-auto">
+                              {user.deliveries
+                                .sort((a, b) => new Date(b.shippedAt).getTime() - new Date(a.shippedAt).getTime())
+                                .map((delivery) => (
+                                <div key={delivery.id} className="p-2 bg-gray-50 rounded text-xs">
+                                  <p><strong>Shipped:</strong> {new Date(delivery.shippedAt).toLocaleString()}</p>
                                   <p><strong>Items:</strong> {delivery.items}</p>
-                                </li>
+                                </div>
                               ))}
-                            </ul>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -233,30 +432,61 @@ export default function AdminDashboard() {
         </section>
       </div>
 
-      {/* Modal for shipping items */}
+      {/* Enhanced Modal for logging deliveries */}
       {isModalOpen && selectedUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg max-w-lg w-full">
-            <h3 className="text-xl font-semibold mb-4">Log Delivery for {selectedUser.email}</h3>
-            <textarea
-              rows={5}
-              className="w-full p-2 border border-gray-300 rounded-md"
-              placeholder="Enter items shipped..."
-              value={itemsShipped}
-              onChange={(e) => setItemsShipped(e.target.value)}
-            />
-            <div className="mt-4">
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={(e) => e.target === e.currentTarget && handleCloseModal()}
+        >
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold">Log Delivery</h3>
               <button
-                className="mr-2 px-4 py-1 bg-red-600 text-white rounded hover:bg-red-700"
                 onClick={handleCloseModal}
+                className="text-gray-400 hover:text-gray-600 text-xl"
+                disabled={savingDelivery}
               >
-                Close
+                ×
+              </button>
+            </div>
+
+            <div className="mb-4 p-3 bg-gray-50 rounded">
+              <p className="text-sm text-gray-600">Customer:</p>
+              <p className="font-medium">{selectedUser.email}</p>
+              {selectedUser.subscriptionTier && (
+                <p className="text-sm text-gray-600">Tier: {selectedUser.subscriptionTier}</p>
+              )}
+            </div>
+
+            <div className="mb-4">
+              <label htmlFor="items-shipped" className="block text-sm font-medium text-gray-700 mb-2">
+                Items Shipped *
+              </label>
+              <textarea
+                id="items-shipped"
+                rows={5}
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter detailed description of items shipped..."
+                value={itemsShipped}
+                onChange={(e) => setItemsShipped(e.target.value)}
+                disabled={savingDelivery}
+              />
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded hover:bg-gray-300 transition-colors"
+                onClick={handleCloseModal}
+                disabled={savingDelivery}
+              >
+                Cancel
               </button>
               <button
-                className="px-4 py-1 bg-green-600 text-white rounded hover:bg-green-700"
+                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 onClick={handleSaveDelivery}
+                disabled={savingDelivery || !itemsShipped.trim()}
               >
-                Save Delivery Log
+                {savingDelivery ? 'Saving...' : 'Save Delivery Log'}
               </button>
             </div>
           </div>
