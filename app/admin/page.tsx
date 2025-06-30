@@ -35,7 +35,8 @@ interface DeliveryFormData {
 
 // Constants
 const RECENT_DELIVERY_DAYS = 30;
-const UPCOMING_DELIVERY_WARNING_DAYS = 7;
+const UPCOMING_DELIVERY_WARNING_DAYS = 5; // Yellow warning within 5 days
+const DELIVERY_CYCLE_DAYS = 30; // Assume monthly deliveries
 
 export default function AdminDashboard() {
   const { user, isLoggedIn, loading: authLoading } = useAuth();
@@ -103,27 +104,38 @@ export default function AdminDashboard() {
     ));
   }, [users, searchTerm]);
 
-  // Utility functions
-  const hasRecentDelivery = useCallback((user: SubscriptionUser): boolean => {
-    if (!user.deliveries?.length) return false;
-
-    const lastDelivery = new Date(user.deliveries[user.deliveries.length - 1].shippedAt);
-    const daysSinceLastDelivery = Math.floor((Date.now() - lastDelivery.getTime()) / (1000 * 60 * 60 * 24));
-
-    return daysSinceLastDelivery <= RECENT_DELIVERY_DAYS;
-  }, []);
-
-  const isUpcomingDeliveryDue = useCallback((user: SubscriptionUser): boolean => {
-    if (!user.deliveries?.length) return false;
+  // Utility functions for delivery status
+  const getDeliveryStatus = useCallback((user: SubscriptionUser): 'none' | 'upcoming' | 'overdue' | 'recent' => {
+    if (!user.deliveries?.length) return 'none';
 
     const lastDelivery = new Date(user.deliveries[user.deliveries.length - 1].shippedAt);
     const nextDeliveryDue = new Date(lastDelivery);
-    nextDeliveryDue.setMonth(lastDelivery.getMonth() + 1);
+    nextDeliveryDue.setDate(lastDelivery.getDate() + DELIVERY_CYCLE_DAYS);
 
-    const daysUntilDue = Math.ceil((nextDeliveryDue.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    const now = new Date();
+    const daysUntilDue = Math.ceil((nextDeliveryDue.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const daysSinceLastDelivery = Math.floor((now.getTime() - lastDelivery.getTime()) / (1000 * 60 * 60 * 24));
 
-    return daysUntilDue <= UPCOMING_DELIVERY_WARNING_DAYS && daysUntilDue > 0;
+    // If last delivery was recent (within 30 days), consider it recent
+    if (daysSinceLastDelivery <= RECENT_DELIVERY_DAYS) {
+      return 'recent';
+    }
+
+    // If next delivery is due within warning period, mark as upcoming
+    if (daysUntilDue <= UPCOMING_DELIVERY_WARNING_DAYS && daysUntilDue > 0) {
+      return 'upcoming';
+    }
+
+    // If next delivery is overdue (past due date), mark as overdue
+    if (daysUntilDue <= 0) {
+      return 'overdue';
+    }
+
+    // Default to recent if we have deliveries but don't fit other categories
+    return 'recent';
   }, []);
+
+
 
   // Event handlers
   const handleFilled = useCallback((userId: string) => {
@@ -213,19 +225,21 @@ export default function AdminDashboard() {
   // Statistics - moved before conditional returns to follow Rules of Hooks
   const stats = useMemo(() => {
     const totalUsers = users.length;
-    const usersWithRecentDeliveries = users.filter(hasRecentDelivery).length;
-    const usersDueForDelivery = users.filter(isUpcomingDeliveryDue).length;
-    const newSubscribers = users.filter(user => user.isNewSubscriber).length;
+    const usersWithRecentDeliveries = users.filter(user => getDeliveryStatus(user) === 'recent').length;
+    const usersDueForDelivery = users.filter(user => getDeliveryStatus(user) === 'upcoming').length;
+    const usersOverdue = users.filter(user => getDeliveryStatus(user) === 'overdue').length;
+    const usersWithNoDeliveries = users.filter(user => getDeliveryStatus(user) === 'none').length;
     const totalDeliveries = users.reduce((sum, user) => sum + (user.deliveries?.length || 0), 0);
 
     return {
       totalUsers,
       usersWithRecentDeliveries,
       usersDueForDelivery,
-      newSubscribers,
+      usersOverdue,
+      usersWithNoDeliveries,
       totalDeliveries,
     };
-  }, [users, hasRecentDelivery, isUpcomingDeliveryDue]);
+  }, [users, getDeliveryStatus]);
 
   // Loading states
   if (authLoading) {
@@ -268,7 +282,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
         <div className="bg-white p-4 rounded-lg shadow border">
           <div className="text-2xl font-bold text-blue-600">{stats.totalUsers}</div>
           <div className="text-sm text-gray-600">Total Subscribers</div>
@@ -279,11 +293,15 @@ export default function AdminDashboard() {
         </div>
         <div className="bg-white p-4 rounded-lg shadow border">
           <div className="text-2xl font-bold text-yellow-600">{stats.usersDueForDelivery}</div>
-          <div className="text-sm text-gray-600">Due for Delivery</div>
+          <div className="text-sm text-gray-600">Due Soon</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow border">
-          <div className="text-2xl font-bold text-purple-600">{stats.newSubscribers}</div>
-          <div className="text-sm text-gray-600">New Subscribers</div>
+          <div className="text-2xl font-bold text-red-600">{stats.usersOverdue}</div>
+          <div className="text-sm text-gray-600">Overdue</div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow border">
+          <div className="text-2xl font-bold text-gray-600">{stats.usersWithNoDeliveries}</div>
+          <div className="text-sm text-gray-600">No Deliveries</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow border">
           <div className="text-2xl font-bold text-indigo-600">{stats.totalDeliveries}</div>
@@ -293,14 +311,22 @@ export default function AdminDashboard() {
 
       {/* Legend */}
       <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-        <h3 className="text-sm font-medium text-gray-700 mb-2">Status Legend:</h3>
+        <h3 className="text-sm font-medium text-gray-700 mb-2">Delivery Status Legend:</h3>
         <div className="flex flex-wrap gap-4 text-sm text-gray-600">
           <div className="flex items-center">
             <span className="inline-block w-3 h-3 bg-green-500 rounded-full mr-2"></span>
-            Has delivery history
+            Recent delivery (last {RECENT_DELIVERY_DAYS} days)
+          </div>
+          <div className="flex items-center">
+            <span className="inline-block w-3 h-3 bg-yellow-500 rounded-full mr-2"></span>
+            Delivery due soon (within {UPCOMING_DELIVERY_WARNING_DAYS} days)
           </div>
           <div className="flex items-center">
             <span className="inline-block w-3 h-3 bg-red-500 rounded-full mr-2"></span>
+            Delivery overdue
+          </div>
+          <div className="flex items-center">
+            <span className="inline-block w-3 h-3 bg-gray-400 rounded-full mr-2"></span>
             No deliveries yet
           </div>
         </div>
@@ -354,19 +380,53 @@ export default function AdminDashboard() {
                   </li>
                 ) : (
                   filteredUsers.map((user) => {
-                    const hasAnyDeliveries = user.deliveries && user.deliveries.length > 0;
+                    const deliveryStatus = getDeliveryStatus(user);
 
-                    const userCardClass = `border-l-4 pb-4 pl-4 rounded transition-colors ${
-                      hasAnyDeliveries
-                        ? 'border-green-500 bg-green-50'
-                        : 'border-red-500 bg-red-50'
-                    }`;
+                    const getCardStyling = (status: string) => {
+                      switch (status) {
+                        case 'recent':
+                          return 'border-green-500 bg-green-50';
+                        case 'upcoming':
+                          return 'border-yellow-500 bg-yellow-50';
+                        case 'overdue':
+                          return 'border-red-500 bg-red-50';
+                        case 'none':
+                        default:
+                          return 'border-gray-400 bg-gray-50';
+                      }
+                    };
+
+                    const userCardClass = `border-l-4 pb-4 pl-4 rounded transition-colors ${getCardStyling(deliveryStatus)}`;
+
+                    const getStatusText = (status: string) => {
+                      switch (status) {
+                        case 'recent':
+                          return 'Recent delivery';
+                        case 'upcoming':
+                          return 'Delivery due soon';
+                        case 'overdue':
+                          return 'Delivery overdue';
+                        case 'none':
+                        default:
+                          return 'No deliveries yet';
+                      }
+                    };
 
                     return (
                       <div key={user.id} className={userCardClass}>
-                        <h3 className="font-bold text-lg truncate" title={user.email}>
-                          {user.email}
-                        </h3>
+                        <div className="flex justify-between items-start mb-2">
+                          <h3 className="font-bold text-lg truncate" title={user.email}>
+                            {user.email}
+                          </h3>
+                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                            deliveryStatus === 'recent' ? 'bg-green-100 text-green-800' :
+                            deliveryStatus === 'upcoming' ? 'bg-yellow-100 text-yellow-800' :
+                            deliveryStatus === 'overdue' ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {getStatusText(deliveryStatus)}
+                          </span>
+                        </div>
                         <div className="space-y-1 text-sm">
                           <p><strong>Role:</strong> {user.role}</p>
                           {user.stripeCustomerId && (
