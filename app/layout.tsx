@@ -3,11 +3,10 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "./components/navbar";
 
-import { ModalProvider } from "./context/ModalContext"; 
-import { AuthProvider } from "./context/AuthContext";   
+import { ModalProvider } from "./context/ModalContext";
+import { AuthProvider } from "./context/AuthContext";
 import AuthModal from "./components/AuthModal";
 import Footer from "./components/Footer";
-
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,7 +35,7 @@ export default function RootLayout({
           <ModalProvider>
             <Navbar />
             <main className="flex-grow">{children}</main>
-            <Footer /> {/* ✅ Now global across all pages */}
+            <Footer />
             <AuthModal />
           </ModalProvider>
         </AuthProvider>
@@ -44,4 +43,3 @@ export default function RootLayout({
     </html>
   );
 }
-

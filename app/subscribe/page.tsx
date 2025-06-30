@@ -261,20 +261,24 @@ export default function Subscribe() {
           </p>
 
           <button
-            disabled={isCurrentPlan || (hasActivePlan && !isCurrentPlan)}
-            className={`w-full py-2 px-4 rounded-full font-medium text-white transition-colors duration-200 ${
-              isCurrentPlan || (hasActivePlan && !isCurrentPlan)
-                ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-blue-600 hover:bg-blue-700'
-            }`}
-            onClick={() => handleSubscription(info.stripePriceId)}
-          >
-            {isCurrentPlan
-              ? 'Subscribed'
-              : hasActivePlan
-              ? 'You Have an Active Plan'
-              : 'Subscribe'}
-          </button>
+  disabled={!isLoggedIn || isCurrentPlan || (hasActivePlan && !isCurrentPlan)}
+  className={`w-full py-2 px-4 rounded-full font-medium text-white transition-colors duration-200 ${
+    !isLoggedIn || isCurrentPlan || (hasActivePlan && !isCurrentPlan)
+      ? 'bg-gray-400 cursor-not-allowed'
+      : 'bg-blue-600 hover:bg-blue-700'
+  }`}
+  onClick={() => handleSubscription(info.stripePriceId)}
+>
+  {
+    !isLoggedIn
+      ? 'Log in to Subscribe' // New text when not logged in
+      : isCurrentPlan
+      ? 'Subscribed'
+      : hasActivePlan
+      ? 'You Have an Active Plan'
+      : 'Subscribe'
+  }
+</button>
         </motion.div>
       </motion.div>
     );
